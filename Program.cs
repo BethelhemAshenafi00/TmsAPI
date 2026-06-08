@@ -9,6 +9,24 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddSingleton<EnrollmentWorker>();
+
+builder.Services
+    .AddOptions<PaymentOptions>()
+    .BindConfiguration("Payments")
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddScoped<
+    IEnrollmentService,
+    EnrollmentService>();
+
+    builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = true;
+});
+
 var app = builder.Build();
 
 app.UseRouting();
@@ -30,5 +48,13 @@ app.MapGet("/api/assessments/results", () =>
     });
 })
 .RequireAuthorization();
+
+app.MapGet("/api/enrollments/worker-smoke",
+    (EnrollmentWorker worker) =>
+{
+    worker.ProcessBatch();
+
+    return Results.Ok("processed");
+});
 
 app.Run();
