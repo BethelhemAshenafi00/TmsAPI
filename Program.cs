@@ -8,6 +8,7 @@ builder.Services
         TrainingAuthHandler>("Training", null);
 
 builder.Services.AddAuthorization();
+builder.Services.AddControllers();
 
 builder.Services.AddSingleton<EnrollmentWorker>();
 
@@ -29,14 +30,18 @@ builder.Services.AddScoped<
 
 var app = builder.Build();
 
+
 app.UseRouting();
 app.UseMiddleware<RequestLoggingMiddleware>();
+
+
 app.UseExceptionHandler("/error");
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
-
 app.UseAuthorization();
+
+app.MapControllers();
 
 app.MapGet("/api/assessments/results", () =>
 {

@@ -1,6 +1,7 @@
 
 
 
-GET http://localhost:5000/api/assessments/results
+GET http://localhost:5000/api/enrollments
+
 
 ###
