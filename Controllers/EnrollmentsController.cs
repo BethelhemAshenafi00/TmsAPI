@@ -3,17 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/[controller]")]
 public class EnrollmentsController(IEnrollmentService enrollmentService) : ControllerBase
 {
-    // create new enrollment
-   /*  [HttpPost]
-    public async Task<IActionResult> Create([FromBody] EnrollmentRecord request)
-    {
-        var result = await enrollmentService.EnrollAsync(
-            request.StudentId,
-            request.CourseCode);
-        return Ok(result);
-    } */
 
-
+public record CreateEnrollmentRequest(string StudentId, string CourseCode);
 
 
     //GET/api/enrollments returns all enrollment records
@@ -30,5 +21,21 @@ public class EnrollmentsController(IEnrollmentService enrollmentService) : Contr
         var record = await enrollmentService.GetByIdAsync(id);
         return record is not null ? Ok(record) : NotFound();
 
+    }
+
+    //POST with 201 + Location
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateEnrollmentRequest request)
+    {
+        var record = await enrollmentService.EnrollAsync(request.StudentId, request.CourseCode);
+        return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
+    }
+
+    //DELETE/api/enrollments/{id} returns 204 or 404
+    [HttpDelete("{id}")]
+    public async Task <IActionResult> DeleteAsync(string id)
+    {
+        var deleted = await enrollmentService.DeleteAsync(id);
+        return deleted ? NoContent() : NotFound();
     }
 }

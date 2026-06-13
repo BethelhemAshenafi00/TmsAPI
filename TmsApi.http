@@ -1,7 +1,7 @@
 
 
 
-GET http://localhost:5000/api/enrollments
+GET http://localhost:5000/scalar/v1
 
 
 ###
