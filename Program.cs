@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Scalar.AspNetCore;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +21,8 @@ builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 
 // OpenAPI (Exercise 7)
-/* builder.Services.AddOpenApi();
- */
+ builder.Services.AddOpenApi();
+ 
 // Background Worker
 builder.Services.AddSingleton<EnrollmentWorker>();
 
@@ -32,7 +34,7 @@ builder.Services
     .ValidateOnStart();
 
 // Enrollment Service
-builder.Services.AddScoped<
+builder.Services.AddSingleton<
     IEnrollmentService,
     EnrollmentService>();
 
@@ -49,10 +51,6 @@ var app = builder.Build();
 // ========================================
 // Exercise 7 - Development Environment
 // ========================================
-if (app.Environment.IsDevelopment())
-{
-    app.MapScalarApiReference();
-}
 
 
 // ========================================
@@ -81,6 +79,13 @@ app.UseAuthorization();
 // Controllers
 // ========================================
 app.MapControllers();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    
+    app.MapScalarApiReference();
+}
+
 
 
 // ========================================

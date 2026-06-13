@@ -1,7 +1,17 @@
+// DELETE http://localhost:5000//api/enrollments/{id}
+// Content-Type: application/json
 
+//{
+//  "studentId": "S-001",
+  //"courseCode": "CS-001"
+// } 
 
+GET http://localhost:5000/api/enrollments
 
-GET http://localhost:5000/scalar/v1
+# POST http://localhost:5000/api/enrollments
+# Content-Type: application/json
 
-
-###
+# {
+#   "studentId": "S-001",
+#   "courseCode": "CS-001"
+# }
