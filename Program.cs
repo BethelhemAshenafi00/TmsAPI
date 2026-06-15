@@ -25,6 +25,12 @@ builder.Services.AddProblemDetails();
  
 // Background Worker
 builder.Services.AddSingleton<EnrollmentWorker>();
+// Student Service
+
+builder.Services.AddSingleton<IStudentService, StudentService>();
+
+// Course Service
+builder.Services.AddSingleton<ICourseService, CourseService>();
 
 // Options Pattern + Validation
 builder.Services
@@ -47,10 +53,6 @@ builder.Host.UseDefaultServiceProvider(options =>
 
 var app = builder.Build();
 
-
-// ========================================
-// Exercise 7 - Development Environment
-// ========================================
 
 
 // ========================================
@@ -123,6 +125,50 @@ app.MapGet("/api/error", () =>
     throw new TmsDatabaseException(
         "Simulated database failure for ProblemDetails testing");
 });
+  
+
+
+  // ========= Student Endpoints ==========//
+
+// ========================================
+// one that returns a single student
+// ========================================
+app.MapGet("/api/students/{id}", async (IStudentService service, string id) =>
+{
+    var student = await service.GetByIdAsync(id);
+    return student is not null ? Results.Ok(student) : Results.NotFound();
+});
+
+
+
+// ========================================
+// one that returns all students 
+// ========================================
+app.MapGet("/api/students/all", async (IStudentService service) =>
+{
+    var students = await service.GetAllAsync();
+    return Results.Ok(students);
+});
+
+// ========== Course Endpoints ==========//
+// ========================================
+// one that returns a single course 
+// ========================================
+app.MapGet("/api/courses/{id}", async (ICourseService service, string id) =>
+{
+    var course = await service.GetByIdAsync(id);
+    return course is not null ? Results.Ok(course) : Results.NotFound();
+});
+
+// ========================================
+// one that returns all courses
+// ========================================
+app.MapGet("/api/courses/all", async (ICourseService service) =>
+{
+    var courses = await service.GetAllAsync();
+    return Results.Ok(courses);
+});
+
 
 
 app.Run();

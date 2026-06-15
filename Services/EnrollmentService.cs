@@ -1,10 +1,4 @@
-public interface IEnrollmentService
-{
-    Task<EnrollmentRecord> EnrollAsync(string studentId, string courseCode);
-    Task<EnrollmentRecord?> GetByIdAsync(string id);
-    Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync();
-    Task<bool> DeleteAsync(string id);
-}
+
 
 public class EnrollmentService : IEnrollmentService
 {
@@ -102,8 +96,3 @@ public class EnrollmentService : IEnrollmentService
     }
 }
 
-public record EnrollmentRecord(
-    string Id,
-    string StudentId,
-    string CourseCode,
-    DateTime EnrolledAt);

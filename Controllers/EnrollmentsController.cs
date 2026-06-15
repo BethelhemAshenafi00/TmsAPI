@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 public class EnrollmentsController(IEnrollmentService enrollmentService) : ControllerBase
 {
 
-public record CreateEnrollmentRequest(string StudentId, string CourseCode);
+
 
 
     //GET/api/enrollments returns all enrollment records
