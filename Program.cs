@@ -47,9 +47,11 @@ builder.Services.AddSingleton<
     IEnrollmentService,
     EnrollmentService>();
 
-// Register TmsDbContext scoped for incoming HTTP requests
+// Register TmsDbContext scoped for incoming HTTP request
 builder.Services.AddDbContext<TmsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("TmsDatabase"))
+    .LogTo(Console.WriteLine, LogLevel.Information)
+    .EnableSensitiveDataLogging());
 
 // Dependency Validation
 builder.Host.UseDefaultServiceProvider(options =>
