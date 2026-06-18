@@ -1,3 +1,5 @@
+namespace TmsApi.Models;
+
 public class CourseService : ICourseService
 {
     private readonly List<Course> _courses;

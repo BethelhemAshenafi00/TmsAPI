@@ -8,6 +8,8 @@
 
 GET http://localhost:5000/api/students/all
 
+
+
 # POST http://localhost:5000/api/enrollments
 # Content-Type: application/json
 

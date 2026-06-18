@@ -1,3 +1,4 @@
+
 public record EnrollmentRecord(
     string Id,
     string StudentId,

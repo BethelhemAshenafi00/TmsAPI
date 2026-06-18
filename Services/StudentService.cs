@@ -1,3 +1,6 @@
+using TmsApi.Models;
+
+namespace TmsApi.Models;
 public class StudentService : IStudentService
 { 
     private readonly List<Student> _students;     

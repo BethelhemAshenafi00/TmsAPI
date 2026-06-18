@@ -12,8 +12,8 @@ using TmsApi.Data;
 namespace TmsApi.Migrations
 {
     [DbContext(typeof(TmsDbContext))]
-    [Migration("20260616083544_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260618081519_AddAssessmentsAndCertificates")]
+    partial class AddAssessmentsAndCertificates
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -26,42 +26,6 @@ namespace TmsApi.Migrations
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Course", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Capacity")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Courses");
-                });
-
-            modelBuilder.Entity("Student", b =>
-                {
-                    b.Property<string>("StudentId")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Age")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Gpa")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("StudentName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("StudentId");
-
-                    b.ToTable("Students");
-                });
-
-            modelBuilder.Entity("TmsApi.Entities.Course", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,7 +46,92 @@ namespace TmsApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Course");
+                    b.ToTable("Courses");
+                });
+
+            modelBuilder.Entity("Student", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("GPA")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Students");
+                });
+
+            modelBuilder.Entity("TmsApi.Entities.Assessment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MaxScore")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Weight")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.ToTable("Assessments");
+                });
+
+            modelBuilder.Entity("TmsApi.Entities.Certificate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SerialNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("Certificates");
                 });
 
             modelBuilder.Entity("TmsApi.Entities.Enrollment", b =>
@@ -114,42 +163,45 @@ namespace TmsApi.Migrations
                     b.ToTable("Enrollments");
                 });
 
-            modelBuilder.Entity("TmsApi.Entities.Student", b =>
+            modelBuilder.Entity("TmsApi.Entities.Assessment", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                    b.HasOne("Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Navigation("Course");
+                });
 
-                    b.Property<decimal>("GPA")
-                        .HasColumnType("numeric");
+            modelBuilder.Entity("TmsApi.Entities.Certificate", b =>
+                {
+                    b.HasOne("Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                    b.HasOne("Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Navigation("Course");
 
-                    b.Property<string>("RegistrationNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Student");
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("TmsApi.Entities.Enrollment", b =>
                 {
-                    b.HasOne("TmsApi.Entities.Course", "Course")
+                    b.HasOne("Course", "Course")
                         .WithMany("Enrollments")
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TmsApi.Entities.Student", "Student")
+                    b.HasOne("Student", "Student")
                         .WithMany("Enrollments")
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -160,12 +212,12 @@ namespace TmsApi.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("TmsApi.Entities.Course", b =>
+            modelBuilder.Entity("Course", b =>
                 {
                     b.Navigation("Enrollments");
                 });
 
-            modelBuilder.Entity("TmsApi.Entities.Student", b =>
+            modelBuilder.Entity("Student", b =>
                 {
                     b.Navigation("Enrollments");
                 });

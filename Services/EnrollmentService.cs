@@ -1,3 +1,4 @@
+namespace TmsApi.Models;
 
 
 public class EnrollmentService : IEnrollmentService
@@ -95,4 +96,3 @@ public class EnrollmentService : IEnrollmentService
         return Task.FromResult(removed);
     }
 }
-

@@ -1,3 +1,5 @@
+namespace TmsApi.Models;
+
 public interface ICourseService
 {
     Task<Course?> GetByIdAsync(string courseId);
