@@ -65,6 +65,35 @@ public class EnrollmentService : IEnrollmentService
         return Task.FromResult(record);
     }
 
+    public Task<EnrollmentRecord?> UpdateAsync(
+    string id,
+    string studentId,
+    string courseCode)
+{
+    if (!_store.TryGetValue(id, out var existing))
+    {
+        _logger.LogWarning(
+            "Update failed: enrollment {EnrollmentId} not found",
+            id);
+
+        return Task.FromResult<EnrollmentRecord?>(null);
+    }
+
+    var updated = existing with
+    {
+        StudentId = studentId,
+        CourseCode = courseCode
+    };
+
+    _store[id] = updated;
+
+    _logger.LogInformation(
+        "Updated enrollment {EnrollmentId}",
+        id);
+
+    return Task.FromResult<EnrollmentRecord?>(updated);
+}
+
     public Task<IReadOnlyList<EnrollmentRecord>> GetAllAsync()
     {
         IReadOnlyList<EnrollmentRecord> all = _store.Values.ToList();

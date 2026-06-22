@@ -137,10 +137,16 @@ app.MapGet("/api/error", () =>
     throw new TmsDatabaseException(
         "Simulated database failure for ProblemDetails testing");
 });
-  
 
 
-  // ========= Student Endpoints ==========//
+
+// ========= Student Endpoints ==========//
+
+app.MapGet("/api/students", async (IStudentService service) =>
+{
+    var students = await service.GetAllAsync();
+    return Results.Ok(students);
+});
 
 // ========================================
 // one that returns a single student
@@ -197,8 +203,8 @@ using (var scope = app.Services.CreateScope())
             new() { RegistrationNumber = "TMS-2026-0002", Name = "Bob Jones", GPA = 2.9m, IsActive = true },
             new() { RegistrationNumber = "TMS-2026-0003", Name = "Charlie Brown", GPA = 3.4m, IsActive = false },
             new() { RegistrationNumber = "TMS-2026-0004", Name = "Diana Prince", GPA = 3.9m, IsActive = true },
-            new() { RegistrationNumber = "TMS-2026-0005", Name = "Evan Wright", GPA = 2.5m, IsActive = true }
-        };
+            new() { RegistrationNumber = "TMS-2026-0005", Name = "Evan Wright", GPA = 2.5m, IsActive = true },
+          };
 
         context.Students.AddRange(students);
 
@@ -225,4 +231,6 @@ using (var scope = app.Services.CreateScope())
         context.SaveChanges();
     }
 }
+
+
 app.Run();
