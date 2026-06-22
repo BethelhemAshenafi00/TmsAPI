@@ -5,6 +5,7 @@ using TmsApi.Data;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Entities;
 using TmsApi.Models;
+using TmsApi.Services;
 
 
 
@@ -33,11 +34,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<EnrollmentWorker>();
 // Student Service
 
-builder.Services.AddSingleton<IStudentService, StudentService>();
-
-// Course Service
-builder.Services.AddSingleton<ICourseService, CourseService>();
-
+builder.Services.AddScoped<CourseService>();
+builder.Services.AddScoped<StudentService>();
 // Options Pattern + Validation
 builder.Services
     .AddOptions<PaymentOptions>()
@@ -49,6 +47,7 @@ builder.Services
 builder.Services.AddSingleton<
     IEnrollmentService,
     EnrollmentService>();
+
 
 // Register TmsDbContext scoped for incoming HTTP request
 builder.Services.AddDbContext<TmsDbContext>(options =>

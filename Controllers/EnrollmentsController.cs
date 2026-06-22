@@ -40,7 +40,7 @@ public class EnrollmentsController(IEnrollmentService enrollmentService) : Contr
     }
 
     // PUT/api/enrollments/{id}
-[HttpPut("{id}")]
+
 [HttpPut("{id}")]
 public async Task<IActionResult> Update(
     string id,

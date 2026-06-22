@@ -1,69 +1,88 @@
-using TmsApi.Models;
+using Microsoft.EntityFrameworkCore;
+using TmsApi.Data;
+using TmsApi.Entities;
 
-namespace TmsApi.Models;
+namespace TmsApi.Services;
 
-public class StudentService : IStudentService
+public class StudentService
 {
-    private readonly List<Student> _students;
+    private readonly TmsDbContext _context;
 
-    public StudentService()
+    public StudentService(TmsDbContext context)
     {
-        _students = new List<Student>
-        {
-            new Student { StudentId = "STU-001", StudentName = "Abebe", Age = 20, Gpa = 3.5m },
-            new Student { StudentId = "STU-002", StudentName = "Alemu", Age = 22, Gpa = 3.8m },
-            new Student { StudentId = "STU-003", StudentName = "Mulu", Age = 19, Gpa = 3.2m }
-        };
+        _context = context;
     }
 
     // GET ALL
-    public Task<IReadOnlyList<Student>> GetAllAsync()
+    public async Task<IReadOnlyList<Student>> GetAllAsync()
     {
-        return Task.FromResult((IReadOnlyList<Student>)_students);
+        return await _context.Students.ToListAsync();
     }
 
     // GET BY ID
-    public Task<Student?> GetByIdAsync(string studentId)
+    public async Task<Student?> GetByIdAsync(int id)
     {
-        var student = _students.FirstOrDefault(s => s.StudentId == studentId);
-        return Task.FromResult(student);
+        return await _context.Students
+            .FirstOrDefaultAsync(s => s.Id == id);
     }
 
     // CREATE
-    public Task<Student> CreateAsync(Student student)
+    public async Task<Student> CreateAsync(Student student)
     {
-        _students.Add(student);
-        return Task.FromResult(student);
+        _context.Students.Add(student);
+        await _context.SaveChangesAsync();
+
+        return student;
     }
 
     // UPDATE
-    public Task<Student?> UpdateAsync(string studentId, Student updatedStudent)
+    public async Task<Student?> UpdateAsync(int id, Student updatedStudent)
     {
-        var existingStudent = _students.FirstOrDefault(s => s.StudentId == studentId);
+        var existingStudent = await _context.Students
+            .FirstOrDefaultAsync(s => s.Id == id);
 
-        if (existingStudent is null)
+        if (existingStudent == null)
         {
-            return Task.FromResult<Student?>(null);
+            return null;
         }
 
-        existingStudent.StudentName = updatedStudent.StudentName;
-        existingStudent.Age = updatedStudent.Age;
-        existingStudent.Gpa = updatedStudent.Gpa;
+        existingStudent.Name = updatedStudent.Name;
+        existingStudent.RegistrationNumber = updatedStudent.RegistrationNumber;
+        existingStudent.GPA = updatedStudent.GPA;
+        existingStudent.IsActive = updatedStudent.IsActive;
 
-        return Task.FromResult<Student?>(existingStudent);
+        await _context.SaveChangesAsync();
+
+        return existingStudent;
     }
 
     // DELETE
-    public Task<bool> DeleteAsync(string studentId)
+    public async Task<bool> DeleteAsync(int id)
     {
-        var student = _students.FirstOrDefault(s => s.StudentId == studentId);
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.Id == id);
 
-        if (student is null)
+        if (student == null)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
-        _students.Remove(student);
-        return Task.FromResult(true);
+        _context.Students.Remove(student);
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    // PAGINATION
+    public async Task<List<Student>> GetStudentsPageAsync(int page)
+    {
+        const int pageSize = 20;
+
+        return await _context.Students
+            .OrderBy(s => s.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
     }
 }

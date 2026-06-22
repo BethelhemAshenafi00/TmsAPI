@@ -1,66 +1,87 @@
-namespace TmsApi.Models;
+using Microsoft.EntityFrameworkCore;
+using TmsApi.Data;
+using TmsApi.Entities;
 
-public class CourseService : ICourseService
+namespace TmsApi.Services;
+
+public class CourseService
 {
-    private readonly List<Course> _courses;
+    private readonly TmsDbContext _context;
 
-    public CourseService()
+    public CourseService(TmsDbContext context)
     {
-        _courses = new List<Course>
-        {
-            new Course { Id = "CS-001", Title = "Introduction to Full-Stack Development", Capacity = 30 },
-            new Course { Id = "CS-002", Title = "CSharp Programming", Capacity = 25 },
-            new Course { Id = "CS-003", Title = "TypeScript Fundamentals", Capacity = 20 }
-        };
+        _context = context;
     }
 
     // GET BY ID
-    public Task<Course?> GetByIdAsync(string courseId)
+    public async Task<Course?> GetByIdAsync(int id)
     {
-        var course = _courses.FirstOrDefault(c => c.Id == courseId);
-        return Task.FromResult(course);
+        return await _context.Courses
+        .FirstOrDefaultAsync(c => c.Id == id);
     }
 
     // GET ALL
-    public Task<IReadOnlyList<Course>> GetAllAsync()
-    {
-        return Task.FromResult((IReadOnlyList<Course>)_courses);
-    }
+    public async Task<IReadOnlyList<Course>> GetAllAsync()
+{
+    return await _context.Courses.ToListAsync();
+}
 
     // CREATE
-    public Task<Course> CreateAsync(Course course)
+    public async Task<Course> CreateAsync(Course course)
     {
-        _courses.Add(course);
-        return Task.FromResult(course);
+        _context.Courses.Add(course);
+        await _context.SaveChangesAsync();
+        return course;
     }
 
     // UPDATE
-    public Task<Course?> UpdateAsync(string courseId, Course updatedCourse)
+    public async Task<Course?> UpdateAsync(int id, Course updatedCourse)
     {
-        var existingCourse = _courses.FirstOrDefault(c => c.Id == courseId);
+        var existingCourse =await  _context.Courses
+        .FirstOrDefaultAsync(c => c.Id == id);
+
 
         if (existingCourse == null)
         {
-            return Task.FromResult<Course?>(null);
+            return null;
         }
 
         existingCourse.Title = updatedCourse.Title;
+        existingCourse.Code = updatedCourse.Code;
         existingCourse.Capacity = updatedCourse.Capacity;
+        await _context.SaveChangesAsync();
 
-        return Task.FromResult<Course?>(existingCourse);
+        return existingCourse;
     }
 
     // DELETE
-    public Task<bool> DeleteAsync(string courseId)
+    public async Task<bool> DeleteAsync(int id)
     {
-        var course = _courses.FirstOrDefault(c => c.Id == courseId);
+        var course = await _context.Courses
+        .FirstOrDefaultAsync(c => c.Id == id);
 
         if (course == null)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
-        _courses.Remove(course);
-        return Task.FromResult(true);
+        _context.Courses.Remove(course);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+     public async Task<List<Course>> GetTop5CoursesAsync()
+    {
+        return await _context.Enrollments
+            .GroupBy(e => new { e.Course.Id, e.Course.Title, e.Course.Code })
+            .Select(g => new Course
+            {
+                Id = g.Key.Id,
+                Title = g.Key.Title,
+                Code = g.Key.Code,
+                Capacity = g.Count()
+            })
+            .OrderByDescending(x => x.Capacity)
+            .Take(5)
+            .ToListAsync();
     }
 }
