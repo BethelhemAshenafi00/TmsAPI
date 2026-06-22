@@ -38,4 +38,25 @@ public class EnrollmentsController(IEnrollmentService enrollmentService) : Contr
         var deleted = await enrollmentService.DeleteAsync(id);
         return deleted ? NoContent() : NotFound();
     }
+
+    // PUT/api/enrollments/{id}
+[HttpPut("{id}")]
+[HttpPut("{id}")]
+public async Task<IActionResult> Update(
+    string id,
+    [FromBody] CreateEnrollmentRequest request)
+{
+    var updated = await enrollmentService.UpdateAsync(
+        id,
+        request.StudentId,
+        request.CourseCode);
+
+    if (updated is null)
+    {
+        return NotFound();
+    }
+
+    return Ok(updated);
+}
+
 }
