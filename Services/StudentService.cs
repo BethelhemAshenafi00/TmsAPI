@@ -1,10 +1,7 @@
-<<<<<<< Updated upstream
-=======
 using TmsApi.Models;
 
 namespace TmsApi.Models;
 
->>>>>>> Stashed changes
 public class StudentService : IStudentService
 {
     private readonly List<Student> _students;

@@ -28,7 +28,7 @@ public class StudentsController(IStudentService studentService) : ControllerBase
 
     // POST: api/students
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] TmsApi.Models.Student student)
+    public async Task<IActionResult> Create([FromBody] Student student)
     {
         var createdStudent = await studentService.CreateAsync(student);
 
@@ -40,7 +40,7 @@ public class StudentsController(IStudentService studentService) : ControllerBase
 
     // PUT: api/students/STU-001
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] TmsApi.Models.Student student)
+    public async Task<IActionResult> Update(string id, [FromBody] Student student)
     {
         var updatedStudent = await studentService.UpdateAsync(id, student);
 
