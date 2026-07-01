@@ -28,5 +28,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
 
         builder.Property(s => s.IsActive)
             .HasDefaultValue(true);
+           
+        builder.Property<DateTime>("LastUpdated");
+        builder.Property(s => s.Version)
+       .IsRowVersion();
+       
     }
 }

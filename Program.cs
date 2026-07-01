@@ -12,6 +12,9 @@ using TmsApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Controllers
+ builder.Services.AddControllers();
+
 // Authentication
 builder.Services
     .AddAuthentication("Training")
@@ -21,8 +24,7 @@ builder.Services
 // Authorization
 builder.Services.AddAuthorization();
 
-// Controllers
-builder.Services.AddControllers();
+// 
 
 // ProblemDetails (Exercise 6)
 builder.Services.AddProblemDetails();
@@ -31,11 +33,15 @@ builder.Services.AddProblemDetails();
  builder.Services.AddOpenApi();
  
 // Background Worker
-builder.Services.AddSingleton<EnrollmentWorker>();
+// builder.Services.AddScoped<EnrollmentWorker>();
 // Student Service
 
 builder.Services.AddScoped<CourseService>();
-builder.Services.AddScoped<StudentService>();
+ builder.Services.AddScoped<StudentService>();
+ builder.Services.AddScoped<
+    IEnrollmentService,
+    EnrollmentService>();
+
 // Options Pattern + Validation
 builder.Services
     .AddOptions<PaymentOptions>()
@@ -44,9 +50,6 @@ builder.Services
     .ValidateOnStart();
 
 // Enrollment Service
-builder.Services.AddSingleton<
-    IEnrollmentService,
-    EnrollmentService>();
 
 
 // Register TmsDbContext scoped for incoming HTTP request
@@ -69,6 +72,18 @@ var app = builder.Build();
 // ========================================
 // Exercise 6 - Global Error Handling
 // ========================================
+
+
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    
+    app.MapScalarApiReference();
+}
+
 app.UseExceptionHandler();
 
 app.UseStatusCodePages();
@@ -77,11 +92,9 @@ app.UseStatusCodePages();
 // ========================================
 // Middleware Pipeline
 // ========================================
+app.UseHttpsRedirection();
 app.UseRouting();
 
-app.UseMiddleware<RequestLoggingMiddleware>();
-
-app.UseHttpsRedirection();
 
 app.UseAuthentication();
 
@@ -92,99 +105,94 @@ app.UseAuthorization();
 // Controllers
 // ========================================
 app.MapControllers();
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    
-    app.MapScalarApiReference();
-}
+
 
 
 
 // ========================================
 // Protected Endpoint (Session 1)
 // ========================================
-app.MapGet("/api/assessments/results", () =>
-{
-    return Results.Ok(new
-    {
-        courseCode = "CS-101",
-        studentId = "S-001",
-        letterGrade = "A"
-    });
-})
-.RequireAuthorization();
+// app.MapGet("/api/assessments/results", () =>
+// {
+//     return Results.Ok(new
+//     {
+//         courseCode = "CS-101",
+//         studentId = "S-001",
+//         letterGrade = "A"
+//     });
+// })
+// .RequireAuthorization();
 
 
 // ========================================
 // Worker Test Endpoint (Session 2)
 // ========================================
-app.MapGet("/api/enrollments/worker-smoke",
-    (EnrollmentWorker worker) =>
-{
-    worker.ProcessBatch();
+// app.MapGet("/api/enrollments/worker-smoke",
+//     (EnrollmentWorker worker) =>
+// {
+//     worker.ProcessBatch();
 
-    return Results.Ok("processed");
-});
+//     return Results.Ok("processed");
+// });
 
 
 // ========================================
 // Exercise 6 - ProblemDetails Test Route
 // ========================================
-app.MapGet("/api/error", () =>
-{
-    throw new TmsDatabaseException(
-        "Simulated database failure for ProblemDetails testing");
-});
+// app.MapGet("/api/error", () =>
+// {
+//     throw new TmsDatabaseException(
+//         "Simulated database failure for ProblemDetails testing");
+// });
 
 
 
 // ========= Student Endpoints ==========//
 
-app.MapGet("/api/students", async (IStudentService service) =>
-{
-    var students = await service.GetAllAsync();
-    return Results.Ok(students);
-});
+// app.MapGet("/api/students", async (IStudentService service) =>
+// {
+//     var students = await service.GetAllAsync();
+//     return Results.Ok(students);
+// });
 
 // ========================================
 // one that returns a single student
 // ========================================
-app.MapGet("/api/students/{id}", async (IStudentService service, string id) =>
-{
-    var student = await service.GetByIdAsync(id);
-    return student is not null ? Results.Ok(student) : Results.NotFound();
-});
+// app.MapGet("/api/students/{id}", async (IStudentService service, string id) =>
+// {
+//     var student = await service.GetByIdAsync(id);
+//     return student is not null ? Results.Ok(student) : Results.NotFound();
+// });
 
 
 
 // ========================================
 // one that returns all students 
 // ========================================
-app.MapGet("/api/students/all", async (IStudentService service) =>
-{
-    var students = await service.GetAllAsync();
-    return Results.Ok(students);
-});
+// app.MapGet("/api/students/all", async (IStudentService service) =>
+// {
+//     var students = await service.GetAllAsync();
+//     return Results.Ok(students);
+// });
 
 // ========== Course Endpoints ==========//
 // ========================================
 // one that returns a single course 
 // ========================================
-app.MapGet("/api/courses/{id}", async (ICourseService service, string id) =>
-{
-    var course = await service.GetByIdAsync(id);
-    return course is not null ? Results.Ok(course) : Results.NotFound();
-});
+// app.MapGet("/api/courses/{id}", async (ICourseService service, string id) =>
+// {
+//     var course = await service.GetByIdAsync(id);
+//     return course is not null ? Results.Ok(course) : Results.NotFound();
+// });
 
 // ========================================
 // one that returns all courses
 // ========================================
-app.MapGet("/api/courses/all", async (ICourseService service) =>
-{
-    var courses = await service.GetAllAsync();
-    return Results.Ok(courses);
-});
+// app.MapGet("/api/courses/all", async (ICourseService service) =>
+// {
+//     var courses = await service.GetAllAsync();
+//     return Results.Ok(courses);
+// });
 
 //M5-session ex2 step 2 write an auto-seeder
 

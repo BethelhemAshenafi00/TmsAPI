@@ -13,6 +13,26 @@ public class StudentService
         _context = context;
     }
 
+
+public async Task ShowEnrollmentCountsNPlusOneAsync(
+    CancellationToken cancellationToken = default)
+{
+    var students = await _context.Students
+        .AsNoTracking()
+        .ToListAsync(cancellationToken);
+
+    foreach (var s in students)
+    {
+        var count = await _context.Enrollments
+            .AsNoTracking()
+            .CountAsync(
+                e => e.StudentId == s.Id,
+                cancellationToken);
+
+        Console.WriteLine(
+            $"{s.Name}: {count} enrollments");
+    }
+}
     // GET ALL
     public async Task<IReadOnlyList<Student>> GetAllAsync()
     {
@@ -80,9 +100,26 @@ public class StudentService
         const int pageSize = 20;
 
         return await _context.Students
-            .OrderBy(s => s.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .OrderBy(s => s.Name) // order by name
+            .Skip((page - 1) * pageSize) // skip from previous page 
+            .Take(pageSize) // return 
             .ToListAsync();
     }
+public async Task ShowStudentEnrollmentCountsAsync()
+{
+    var report = await _context.Students
+        .AsNoTracking()
+        .Select(s => new
+        {
+            s.Name,
+            EnrollmentCount = s.Enrollments.Count
+        })
+        .ToListAsync();
+
+    foreach (var r in report)
+    {
+        Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
+    }
+}
+   
 }

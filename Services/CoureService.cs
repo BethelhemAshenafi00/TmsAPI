@@ -72,16 +72,16 @@ public class CourseService
      public async Task<List<Course>> GetTop5CoursesAsync()
     {
         return await _context.Enrollments
-            .GroupBy(e => new { e.Course.Id, e.Course.Title, e.Course.Code })
+            .GroupBy(e => new { e.Course.Id, e.Course.Title, e.Course.Code }) // Group by course
             .Select(g => new Course
             {
                 Id = g.Key.Id,
                 Title = g.Key.Title,
                 Code = g.Key.Code,
-                Capacity = g.Count()
+                Capacity = g.Count() //How many students in each course
             })
             .OrderByDescending(x => x.Capacity)
-            .Take(5)
+            .Take(5) // Show only the best 5 courses
             .ToListAsync();
     }
 }

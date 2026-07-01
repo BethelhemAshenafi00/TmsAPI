@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Linq;
 using TmsApi.Data;
+using TmsApi.Services;
 
 namespace TmsApi.Controllers
 {
@@ -10,10 +11,12 @@ namespace TmsApi.Controllers
     public class TestController : ControllerBase
     {
         private readonly TmsDbContext _context;
+        private readonly StudentService _studentService;
 
-        public TestController(TmsDbContext context)
+        public TestController(TmsDbContext context, StudentService studentService)
         {
             _context = context;
+            _studentService = studentService;
         }
 
         [HttpGet("deferred")]
@@ -53,6 +56,20 @@ namespace TmsApi.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
+        public async Task<IActionResult> EnrollmentCounts()
+        {
+            await _studentService.ShowStudentEnrollmentCountsAsync();
+
+        return Ok("Check console output");
+        }
+        [HttpGet("nplusone")]
+public async Task<IActionResult> TestNPlusOne()
+{
+    await _studentService.ShowEnrollmentCountsNPlusOneAsync();
+
+    return Ok("Done");
+}
     }
+
 }
     
