@@ -1,10 +1,9 @@
-namespace TmsApi.Models;
+using Tms.Api.Dtos;
+namespace TmsApi.Services;
 
 public interface ICourseService
 {
-    Task<Course?> GetByIdAsync(string courseId);
-    Task<IReadOnlyList<Course>> GetAllAsync();
-    Task<Course> CreateAsync(Course course);
-    Task<Course?> UpdateAsync(string courseId, Course updatedCourse);
-    Task<bool> DeleteAsync(string courseId);
+    Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct);
+    Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct);
+    Task<bool> CodeExistsAsync(string code, CancellationToken ct);
 }

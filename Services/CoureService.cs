@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Data;
+using Tms.Api.Dtos;
 using TmsApi.Entities;
+using TmsApi.Services;
 
 namespace TmsApi.Services;
 
-public class CourseService
+public class CourseService : ICourseService
 {
     private readonly TmsDbContext _context;
 
@@ -13,75 +15,44 @@ public class CourseService
         _context = context;
     }
 
-    // GET BY ID
-    public async Task<Course?> GetByIdAsync(int id)
+    // =========================
+    // GET BY ID (DTO OUTPUT)
+    // =========================
+    public async Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct)
     {
         return await _context.Courses
-        .FirstOrDefaultAsync(c => c.Id == id);
+            .AsNoTracking()
+            .Where(c => c.Id == id)
+            .Select(c => new CourseResponseDto(
+                c.Id,
+                c.Code,
+                c.Title,
+                c.MaxCapacity,
+                c.Enrollments.Count))
+            .FirstOrDefaultAsync(ct);
     }
 
-    // GET ALL
-    public async Task<IReadOnlyList<Course>> GetAllAsync()
-{
-    return await _context.Courses.ToListAsync();
-}
-
-    // CREATE
-    public async Task<Course> CreateAsync(Course course)
+    // =========================
+    // CREATE (DTO INPUT → DTO OUTPUT)
+    // =========================
+    public async Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct)
     {
+        var course = new Course
+        {
+            Code = request.Code,
+            Title = request.Title,
+            MaxCapacity = request.MaxCapacity
+        };
+
         _context.Courses.Add(course);
-        await _context.SaveChangesAsync();
-        return course;
+        await _context.SaveChangesAsync(ct);
+
+        return (await GetByIdAsync(course.Id, ct))!;
     }
-
-    // UPDATE
-    public async Task<Course?> UpdateAsync(int id, Course updatedCourse)
-    {
-        var existingCourse =await  _context.Courses
-        .FirstOrDefaultAsync(c => c.Id == id);
-
-
-        if (existingCourse == null)
-        {
-            return null;
-        }
-
-        existingCourse.Title = updatedCourse.Title;
-        existingCourse.Code = updatedCourse.Code;
-        existingCourse.Capacity = updatedCourse.Capacity;
-        await _context.SaveChangesAsync();
-
-        return existingCourse;
-    }
-
-    // DELETE
-    public async Task<bool> DeleteAsync(int id)
-    {
-        var course = await _context.Courses
-        .FirstOrDefaultAsync(c => c.Id == id);
-
-        if (course == null)
-        {
-            return false;
-        }
-
-        _context.Courses.Remove(course);
-        await _context.SaveChangesAsync();
-        return true;
-    }
-     public async Task<List<Course>> GetTop5CoursesAsync()
-    {
-        return await _context.Enrollments
-            .GroupBy(e => new { e.Course.Id, e.Course.Title, e.Course.Code }) // Group by course
-            .Select(g => new Course
-            {
-                Id = g.Key.Id,
-                Title = g.Key.Title,
-                Code = g.Key.Code,
-                Capacity = g.Count() //How many students in each course
-            })
-            .OrderByDescending(x => x.Capacity)
-            .Take(5) // Show only the best 5 courses
-            .ToListAsync();
-    }
+public async Task<bool> CodeExistsAsync(string code, CancellationToken ct)
+{
+    return await _context.Courses
+        .AsNoTracking()
+        .AnyAsync(c => c.Code == code, ct);
+}
 }

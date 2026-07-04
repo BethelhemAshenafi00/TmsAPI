@@ -1,72 +1,39 @@
 using Microsoft.AspNetCore.Mvc;
-using TmsApi.Models;
-
-namespace TmsApi.Controllers;
+using Tms.Api.Dtos;
+using TmsApi.Services;
+namespace Tms.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class CourseController(ICourseService courseService) : ControllerBase
+[Route("api/courses")]
+public class CoursesController(ICourseService courseService) : ControllerBase
 {
-    // GET: api/course
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
+    [HttpGet("{id:int}", Name = nameof(GetCourseById))]
+    public async Task<IActionResult> GetCourseById(int id, CancellationToken ct)
     {
-        var courses = await courseService.GetAllAsync();
-        return Ok(courses);
+        var course = await courseService.GetByIdAsync(id, ct);
+        return course is not null ? Ok(course) : NotFound();
     }
-
-    // GET: api/course/CS-001
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id)
-    {
-        var course = await courseService.GetByIdAsync(id);
-
-        if (course == null)
-        {
-            return NotFound();
-        }
-
-        return Ok(course);
-    }
-
-    // POST: api/course
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] TmsApi.Models.Course course)
+    [HttpPost]
+public async Task<IActionResult> CreateCourse(
+    CreateCourseRequest request,
+    CancellationToken ct)
+{
+    if (await courseService.CodeExistsAsync(request.Code, ct))
     {
-        var createdCourse = await courseService.CreateAsync(course);
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = createdCourse.Id },
-            createdCourse
-        );
-    }
-
-    // PUT: api/course/CS-001
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] TmsApi.Models.Course course)
-    {
-        var updatedCourse = await courseService.UpdateAsync(id, course);
-
-        if (updatedCourse == null)
+        return Conflict(new ProblemDetails
         {
-            return NotFound();
-        }
-
-        return Ok(updatedCourse);
+            Title = "Course code already exists",
+            Status = StatusCodes.Status409Conflict,
+            Detail = $"A course with code '{request.Code}' is already registered."
+        });
     }
 
-    // DELETE: api/course/CS-001
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
-    {
-        var deleted = await courseService.DeleteAsync(id);
+    var result = await courseService.CreateAsync(request, ct);
 
-        if (!deleted)
-        {
-            return NotFound();
-        }
-
-        return NoContent();
-    }
+    return CreatedAtAction(
+        nameof(GetCourseById),
+        new { id = result.Id },
+        result);
+}
 }
