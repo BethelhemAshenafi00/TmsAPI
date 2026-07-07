@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using TmsApi.Entities;
 using TmsApi.Models;
 using TmsApi.Services;
+using Tms.Api.Persistence;
+using TmsApi.Filters;
 
 
 
@@ -13,7 +15,7 @@ using TmsApi.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Controllers
- builder.Services.AddControllers();
+// builder.Services.AddControllers();
 
 // Authentication
 builder.Services
@@ -30,8 +32,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddProblemDetails();
 
 // OpenAPI (Exercise 7)
- builder.Services.AddOpenApi();
- 
+builder.Services.AddOpenApi();
+
 // Background Worker
 // builder.Services.AddScoped<EnrollmentWorker>();
 // Student Service
@@ -39,10 +41,10 @@ builder.Services.AddProblemDetails();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
- builder.Services.AddScoped<StudentService>();
- builder.Services.AddScoped<
-    IEnrollmentService,
-    EnrollmentService>();
+builder.Services.AddScoped<StudentService>();
+builder.Services.AddScoped<
+   IEnrollmentService,
+   EnrollmentService>();
 
 // Options Pattern + Validation
 builder.Services
@@ -60,6 +62,7 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
     .LogTo(Console.WriteLine, LogLevel.Information)
     .EnableSensitiveDataLogging());
 
+
 // Dependency Validation
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -67,6 +70,10 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateOnBuild = true;
 });
 
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<AuditLogFilter>();
+});
 var app = builder.Build();
 
 
@@ -82,7 +89,7 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    
+
     app.MapScalarApiReference();
 }
 
@@ -107,7 +114,6 @@ app.UseAuthorization();
 // Controllers
 // ========================================
 app.MapControllers();
-
 
 
 
@@ -241,5 +247,11 @@ app.MapControllers();
 //     }
 // }
 
+// Run the seeder automatically during development mode
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
 
+    await DataSeeder.SeedAsync(context);
+}
 app.Run();
