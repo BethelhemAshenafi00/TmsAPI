@@ -12,7 +12,7 @@ using TmsApi.Data;
 namespace TmsApi.Migrations
 {
     [DbContext(typeof(TmsDbContext))]
-    [Migration("20260702080919_RenameCapacityToMaxCapacity")]
+    [Migration("20260709075955_RenameCapacityToMaxCapacity")]
     partial class RenameCapacityToMaxCapacity
     {
         /// <inheritdoc />

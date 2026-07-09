@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TmsApi.Entities;
 using TmsApi.Models;
 using TmsApi.Services;
-using Tms.Api.Persistence;
+using TmsApi.Persistence;
 using TmsApi.Filters;
 
 
@@ -86,10 +86,17 @@ var app = builder.Build();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 
+
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    using var scope = app.Services.CreateScope();
 
+    var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
+
+    await DataSeeder.SeedAsync(context);
+
+    app.MapOpenApi();
     app.MapScalarApiReference();
 }
 
@@ -248,10 +255,5 @@ app.MapControllers();
 // }
 
 // Run the seeder automatically during development mode
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
 
-    await DataSeeder.SeedAsync(context);
-}
 app.Run();

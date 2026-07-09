@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Data;
-namespace Tms.Api.Persistence;
+namespace TmsApi.Persistence;
 
 public static class DataSeeder
 {
@@ -33,22 +33,29 @@ public static class DataSeeder
 ("UX-101", "UX Research and Wireframing", 24),
 ("UX-201", "Design Systems and Tokens", 22),
 ];
-    public static async Task SeedAsync(TmsDbContext context, CancellationToken ct = default)
+   public static async Task SeedAsync(TmsDbContext context, CancellationToken ct = default)
+{
+    Console.WriteLine("Seeder started...");
+
+    await context.Database.MigrateAsync(ct);
+
+    if (await context.Courses.AnyAsync(ct))
     {
-        await context.Database.MigrateAsync(ct);
-        if (await context.Courses.AnyAsync(ct))
-        {
-            return;
-        }
-        foreach (var (code, title, maxCapacity) in Courses)
-        {
-            context.Courses.Add(new Course
-            {
-                Code = code,
-                Title = title,
-                MaxCapacity = maxCapacity
-            });
-        }
-        await context.SaveChangesAsync(ct);
+        Console.WriteLine("Courses already exist.");
+        return;
     }
-}
+
+    foreach (var (code, title, maxCapacity) in Courses)
+    {
+        context.Courses.Add(new Course
+        {
+            Code = code,
+            Title = title,
+            MaxCapacity = maxCapacity
+        });
+    }
+
+    await context.SaveChangesAsync(ct);
+
+    Console.WriteLine("Courses seeded successfully.");
+}}
