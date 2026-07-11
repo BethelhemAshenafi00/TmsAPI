@@ -26,6 +26,24 @@ public class EnrollmentService(
                 e.EnrolledAt))
             .FirstOrDefaultAsync(ct);
 
+
+    // =========================
+    // GET ALL BY COURSE
+    // =========================
+    public Task<List<EnrollmentResponseDto>> GetByCourseAsync(
+        int courseId,
+        CancellationToken ct) =>
+        context.Enrollments
+            .AsNoTracking()
+            .Where(e => e.CourseId == courseId)
+            .Select(e => new EnrollmentResponseDto(
+                e.Id,
+                e.CourseId,
+                e.StudentId,
+                e.EnrolledAt))
+            .ToListAsync(ct);
+
+
     // =========================
     // CREATE ENROLLMENT
     // =========================
