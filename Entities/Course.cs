@@ -11,6 +11,6 @@ public class Course
     public int MaxCapacity { get; set; }
 
     public ICollection<Enrollment> Enrollments { get; set; } = [];
-}
+} 
 
 

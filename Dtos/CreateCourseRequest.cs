@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-namespace Tms.Api.Dtos;
+namespace TmsApi.Dtos;
 public record CreateCourseRequest
 {
     [Required, RegularExpression(@"^[A-Z]{3}-\d{3}$",ErrorMessage = "Code must follow the pattern XXX-000 (e.g., CSE-101).")]
@@ -8,6 +8,6 @@ public record CreateCourseRequest
     public required string Title {get; init;}
     [Required, Range(1, 200)]
     public required int MaxCapacity {get; init;}
-
-
+    [Required, Range(0, 200)]
+    public required int EnrollmentCount {get; init;}
 }

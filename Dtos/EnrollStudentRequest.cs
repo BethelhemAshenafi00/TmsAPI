@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-namespace Tms.Api.Dtos;
+namespace TmsApi.Dtos;
 
 public record EnrollStudentRequest
 {

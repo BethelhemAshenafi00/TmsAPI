@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Data;
-using Tms.Api.Dtos;
+using TmsApi.Dtos;
 using TmsApi.Entities;
 using TmsApi.Services;
 

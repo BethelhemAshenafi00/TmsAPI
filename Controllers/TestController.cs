@@ -56,20 +56,7 @@ namespace TmsApi.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
-        public async Task<IActionResult> EnrollmentCounts()
-        {
-            await _studentService.ShowStudentEnrollmentCountsAsync();
 
-        return Ok("Check console output");
-        }
-        [HttpGet("nplusone")]
-public async Task<IActionResult> TestNPlusOne()
-{
-    await _studentService.ShowEnrollmentCountsNPlusOneAsync();
-
-    return Ok("Done");
-}
     }
-
 }
     

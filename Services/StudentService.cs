@@ -1,125 +1,145 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TmsApi.Data;
+using TmsApi.Dtos;
 using TmsApi.Entities;
 
 namespace TmsApi.Services;
 
-public class StudentService
+public class StudentService : IStudentService
 {
     private readonly TmsDbContext _context;
+    private readonly ILogger<StudentService> _logger;
 
-    public StudentService(TmsDbContext context)
+    public StudentService(
+        TmsDbContext context,
+        ILogger<StudentService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
-
-public async Task ShowEnrollmentCountsNPlusOneAsync(
-    CancellationToken cancellationToken = default)
-{
-    var students = await _context.Students
-        .AsNoTracking()
-        .ToListAsync(cancellationToken);
-
-    foreach (var s in students)
+    // =========================
+    // GET STUDENT BY ID
+    // =========================
+    public async Task<StudentResponseDto> GetByIdAsync(
+        int id,
+        CancellationToken ct)
     {
-        var count = await _context.Enrollments
+        var student = await _context.Students
             .AsNoTracking()
-            .CountAsync(
-                e => e.StudentId == s.Id,
-                cancellationToken);
+            .Where(s => s.Id == id)
+            .Select(s => new StudentResponseDto(
+                s.Id,
+                s.RegistrationNumber,
+                s.Name,
+                s.GPA,
+                s.IsActive,
+                s.Version))
+            .FirstOrDefaultAsync(ct);
 
-        Console.WriteLine(
-            $"{s.Name}: {count} enrollments");
-    }
-}
-    // GET ALL
-    public async Task<IReadOnlyList<Student>> GetAllAsync()
-    {
-        return await _context.Students.ToListAsync();
-    }
-
-    // GET BY ID
-    public async Task<Student?> GetByIdAsync(int id)
-    {
-        return await _context.Students
-            .FirstOrDefaultAsync(s => s.Id == id);
-    }
-
-    // CREATE
-    public async Task<Student> CreateAsync(Student student)
-    {
-        _context.Students.Add(student);
-        await _context.SaveChangesAsync();
+        if (student is null)
+            throw new KeyNotFoundException(
+                $"Student with id {id} not found.");
 
         return student;
     }
 
-    // UPDATE
-    public async Task<Student?> UpdateAsync(int id, Student updatedStudent)
+    // =========================
+    // CREATE STUDENT
+    // =========================
+    public async Task<StudentResponseDto> CreateAsync(
+        CreateStudentRequest request,
+        CancellationToken ct)
     {
-        var existingStudent = await _context.Students
-            .FirstOrDefaultAsync(s => s.Id == id);
-
-        if (existingStudent == null)
+        var student = new Student
         {
-            return null;
-        }
+            RegistrationNumber = request.RegistrationNumber,
+            Name = request.Name,
+            GPA = request.GPA,
+            IsActive = true
+        };
 
-        existingStudent.Name = updatedStudent.Name;
-        existingStudent.RegistrationNumber = updatedStudent.RegistrationNumber;
-        existingStudent.GPA = updatedStudent.GPA;
-        existingStudent.IsActive = updatedStudent.IsActive;
+        _context.Students.Add(student);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
-        return existingStudent;
+        _logger.LogInformation(
+            "Created student {StudentId}",
+            student.Id);
+
+        return await GetByIdAsync(student.Id, ct);
     }
 
-    // DELETE
-    public async Task<bool> DeleteAsync(int id)
+    // =========================
+    // CHECK REGISTRATION NUMBER
+    // =========================
+    public async Task<bool> RegistrationNumberExistsAsync(
+        string registrationNumber,
+        CancellationToken ct)
+    {
+        return await _context.Students.AnyAsync(
+            s => s.RegistrationNumber == registrationNumber,
+            ct);
+    }
+
+    // =========================
+    // GET STUDENTS PAGED
+    // =========================
+    public async Task<PagedResponse<StudentResponseDto>> GetStudentsAsync(
+        PagedRequest request,
+        CancellationToken ct)
+    {
+        var query = _context.Students.AsNoTracking();
+
+        var totalCount = await query.CountAsync(ct);
+
+        var pageSize = Math.Min(request.PageSize, 50);
+        var page = request.Page > 0 ? request.Page : 1;
+
+        var students = await query
+            .OrderBy(s => s.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(s => new StudentResponseDto(
+                s.Id,
+                s.RegistrationNumber,
+                s.Name,
+                s.GPA,
+                s.IsActive,
+                s.Version))
+            .ToListAsync(ct);
+
+        return new PagedResponse<StudentResponseDto>
+        {
+            Items = students,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    // =========================
+    // DELETE STUDENT
+    // =========================
+    public async Task<bool> DeleteAsync(
+        int id,
+        CancellationToken ct)
     {
         var student = await _context.Students
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
 
-        if (student == null)
-        {
+        if (student is null)
             return false;
-        }
 
         _context.Students.Remove(student);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Deleted student {StudentId}",
+            id);
 
         return true;
     }
-
-    // PAGINATION
-    public async Task<List<Student>> GetStudentsPageAsync(int page)
-    {
-        const int pageSize = 20;
-
-        return await _context.Students
-            .OrderBy(s => s.Name) // order by name
-            .Skip((page - 1) * pageSize) // skip from previous page 
-            .Take(pageSize) // return 
-            .ToListAsync();
-    }
-public async Task ShowStudentEnrollmentCountsAsync()
-{
-    var report = await _context.Students
-        .AsNoTracking()
-        .Select(s => new
-        {
-            s.Name,
-            EnrollmentCount = s.Enrollments.Count
-        })
-        .ToListAsync();
-
-    foreach (var r in report)
-    {
-        Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
-    }
-}
-   
 }

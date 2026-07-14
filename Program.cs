@@ -45,6 +45,8 @@ builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<
    IEnrollmentService,
    EnrollmentService>();
+builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+builder.Services.AddScoped<ICertificateService, CertificateService>();
 
 // Options Pattern + Validation
 builder.Services

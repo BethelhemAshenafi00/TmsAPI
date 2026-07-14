@@ -1,4 +1,4 @@
-using Tms.Api.Dtos;
+using TmsApi.Dtos;
 namespace TmsApi.Services;
 
 public interface ICourseService
