@@ -6,7 +6,7 @@
   //"courseCode": "CS-001"
 // } 
 
-GET http://localhost:5000/api/students/all
+GET http://localhost:5000/api/V2/courses
 
 
 
