@@ -108,5 +108,20 @@ public async Task<PagedResponse<CourseResponseDto>> GetCoursesAsync(
         PageSize = request.PageSize
     };
     throw new NotImplementedException();
+}
+public async Task<CourseResponseDto?> GetByCodeAsync(
+    string code,
+    CancellationToken ct)
+{
+    return await _context.Courses
+        .AsNoTracking()
+        .Where(c => c.Code == code)
+        .Select(c => new CourseResponseDto(
+            c.Id,
+            c.Code,
+            c.Title,
+            c.MaxCapacity,
+            c.Enrollments.Count))
+        .FirstOrDefaultAsync(ct);
 }    
 }

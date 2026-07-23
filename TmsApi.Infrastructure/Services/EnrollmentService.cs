@@ -72,4 +72,48 @@ public class EnrollmentService(
 
         return (await GetByIdAsync(courseId, enrollment.Id, ct))!;
     }
+
+
+    // =========================
+    // CHECK IF STUDENT ALREADY ENROLLED
+    // =========================
+    public async Task<bool> ExistsAsync(
+        int studentId,
+        string courseCode,
+        CancellationToken ct)
+    {
+        return await context.Enrollments
+            .AsNoTracking()
+            .AnyAsync(
+                e => e.StudentId == studentId &&
+                     e.Course.Code == courseCode,
+                ct);
+    }
+
+
+    // =========================
+    // ADD ENROLLMENT
+    // =========================
+    public async Task AddAsync(
+        Enrollment enrollment,
+        CancellationToken ct)
+    {
+        context.Enrollments.Add(enrollment);
+        await context.SaveChangesAsync(ct);
+    }
+
+
+    // =========================
+    // GET ENROLLMENTS BY STUDENT
+    // =========================
+    public async Task<List<Enrollment>> GetByStudentIdAsync(
+        int studentId,
+        CancellationToken ct)
+    {
+        return await context.Enrollments
+            .AsNoTracking()
+            .Include(e => e.Course)
+            .Where(e => e.StudentId == studentId)
+            .ToListAsync(ct);
+    }
 }

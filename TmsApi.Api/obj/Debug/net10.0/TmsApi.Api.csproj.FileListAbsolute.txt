@@ -135,3 +135,11 @@ C:\Users\miki computer\TmsApi\TmsApi.Api\obj\Debug\net10.0\refint\TmsApi.Api.dll
 C:\Users\miki computer\TmsApi\TmsApi.Api\obj\Debug\net10.0\TmsApi.Api.pdb
 C:\Users\miki computer\TmsApi\TmsApi.Api\obj\Debug\net10.0\TmsApi.Api.genruntimeconfig.cache
 C:\Users\miki computer\TmsApi\TmsApi.Api\obj\Debug\net10.0\ref\TmsApi.Api.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\FluentValidation.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\FluentValidation.DependencyInjectionExtensions.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\MediatR.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\MediatR.Contracts.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
