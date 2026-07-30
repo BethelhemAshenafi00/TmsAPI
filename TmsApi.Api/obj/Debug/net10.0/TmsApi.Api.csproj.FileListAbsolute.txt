@@ -143,3 +143,4 @@ C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityMod
 C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
 C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
 C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
+C:\Users\miki computer\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.Extensions.Caching.Hybrid.dll

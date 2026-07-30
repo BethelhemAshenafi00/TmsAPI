@@ -124,4 +124,18 @@ public async Task<CourseResponseDto?> GetByCodeAsync(
             c.Enrollments.Count))
         .FirstOrDefaultAsync(ct);
 }    
+// Add this method inside your CourseService class
+public async Task<List<CourseResponseDto>> GetAllAsync(
+    CancellationToken ct)
+{
+    return await _context.Courses
+        .AsNoTracking()
+        .Select(c => new CourseResponseDto(
+            c.Id,
+            c.Code,
+            c.Title,
+            c.MaxCapacity,
+            c.Enrollments.Count))
+        .ToListAsync(ct);
+}
 }

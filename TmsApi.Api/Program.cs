@@ -10,6 +10,11 @@ using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Api.Middlewares;
 
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Mvc;
+using TmsApi.Api.RateLimiting;
+
 using TmsApi.Application;
 using TmsApi.Application.Behaviors;
 using TmsApi.Application.Enrollments.Commands;
@@ -62,6 +67,113 @@ builder.Services
     });
 
 
+//======================================================
+// Configure the global tier-aware limiter
+//======================================================
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter =
+        PartitionedRateLimiter.Create<HttpContext, string>(
+            httpContext =>
+            {
+                var (partitionKey, tier) =
+                    ApiKeyResolver.Resolve(httpContext);
+
+                return tier switch
+                {
+                    ApiKeyTier.Paid =>
+                        RateLimitPartition.GetTokenBucketLimiter(
+                            partitionKey: $"paid:{partitionKey}",
+                            factory: _ =>
+                                new TokenBucketRateLimiterOptions
+                                {
+                                    TokenLimit = 200,
+                                    TokensPerPeriod = 100,
+                                    ReplenishmentPeriod =
+                                        TimeSpan.FromSeconds(10),
+                                    QueueLimit = 0,
+                                    AutoReplenishment = true
+                                }),
+
+                    ApiKeyTier.Free =>
+                        RateLimitPartition.GetTokenBucketLimiter(
+                            partitionKey: $"free:{partitionKey}",
+                            factory: _ =>
+                                new TokenBucketRateLimiterOptions
+                                {
+                                    TokenLimit = 30,
+                                    TokensPerPeriod = 10,
+                                    ReplenishmentPeriod =
+                                        TimeSpan.FromSeconds(10),
+                                    QueueLimit = 0,
+                                    AutoReplenishment = true
+                                }),
+
+                    _ =>
+                        RateLimitPartition.GetTokenBucketLimiter(
+                            partitionKey: $"anon:{partitionKey}",
+                            factory: _ =>
+                                new TokenBucketRateLimiterOptions
+                                {
+                                    TokenLimit = 10,
+                                    TokensPerPeriod = 5,
+                                    ReplenishmentPeriod =
+                                        TimeSpan.FromSeconds(10),
+                                    QueueLimit = 0,
+                                    AutoReplenishment = true
+                                })
+                };
+            });
+
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, ct) =>
+    {
+        var retryAfter = "10";
+
+        if (context.Lease.TryGetMetadata(
+                MetadataName.RetryAfter,
+                out var ts))
+        {
+            retryAfter = ((int)ts.TotalSeconds).ToString();
+        }
+
+        context.HttpContext.Response.Headers.RetryAfter =
+            retryAfter;
+
+        context.HttpContext.Response.ContentType =
+            "application/problem+json";
+
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ProblemDetails
+            {
+                Title = "Rate limit exceeded",
+                Detail =
+                    $"Too many requests. Retry after {retryAfter} seconds.",
+                Status = StatusCodes.Status429TooManyRequests,
+                Type = "https://tms.local/errors/rate_limit_exceeded"
+            },
+            ct);
+    };
+    options.AddConcurrencyLimiter("transcripts", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.QueueLimit = 20;
+        opt.QueueProcessingOrder =
+            QueueProcessingOrder.OldestFirst;
+    });
+    options.AddTokenBucketLimiter("search", opt =>
+{
+    opt.TokenLimit = 10;
+    opt.TokensPerPeriod = 5;
+    opt.ReplenishmentPeriod =
+        TimeSpan.FromSeconds(10);
+    opt.QueueLimit = 2;
+});
+
+});
 // =====================================================
 // AUTHENTICATION
 // =====================================================
@@ -98,7 +210,7 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
-
+builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
 
 // =====================================================
 // MEDIATR - CQRS
@@ -132,6 +244,23 @@ builder.Services.AddHybridCache(options =>
 builder.Services.AddValidatorsFromAssembly(
     typeof(EnrollStudentValidator).Assembly
 );
+
+
+//=======================================================
+//  Handle CORS
+//=======================================================
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Angular", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+
 
 
 // =====================================================
@@ -251,12 +380,30 @@ app.MapScalarApiReference(options =>
         .AddDocument("v2", "API Version 2.0");
 });
 
+// app.MapHealthChecks("/health/live")
+//     .DisableRateLimiting();
+
+// app.MapHealthChecks("/health/ready")
+//     .DisableRateLimiting();
+
+
+// ====================================================
+// Allow Angular
+// ====================================================
+
+app.UseCors("Angular");
 
 // =====================================================
 // STATUS CODE PAGES
 // =====================================================
 
 app.UseStatusCodePages();
+
+//=======================================================
+// RATE LIMITING
+//=======================================================
+
+app.UseRateLimiter();
 
 
 // =====================================================

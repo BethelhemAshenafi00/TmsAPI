@@ -7,7 +7,9 @@ public interface ICourseService
     Task<CourseResponseDto?> GetByIdAsync(
         int id,
         CancellationToken ct);
-
+   Task<List<CourseResponseDto>> GetAllAsync(
+    CancellationToken ct);
+    
     Task<CourseResponseDto?> GetByCodeAsync(
         string code,
         CancellationToken ct);
