@@ -6,9 +6,19 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
+using TmsApi.Api.Notifications;
+using TmsApi.Application.Notifications;
 using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Api.Middlewares;
+
+using System.Threading.Channels;
+using TmsApi.Infrastructure.Workers;
+using TmsApi.Api.Hubs;
+
+using Microsoft.AspNetCore.SignalR;
+using TmsApi.Application.Hubs;
+
 
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,12 +27,14 @@ using TmsApi.Api.RateLimiting;
 
 using TmsApi.Application;
 using TmsApi.Application.Behaviors;
+using TmsApi.Application.Transcripts;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Interfaces;
 
 using TmsApi.Domain.Entities;
 
 using TmsApi.Infrastructure.Persistence;
+using TmsApi.Infrastructure.Transcripts;
 using TmsApi.Infrastructure.Services;
 
 using Microsoft.Extensions.Caching.Hybrid;
@@ -211,7 +223,17 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
 builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
+builder.Services.AddSingleton<
+    ITranscriptStatusStore,
+    InMemoryTranscriptStatusStore>();
+builder.Services.AddSingleton(
+    Channel.CreateBounded<TranscriptRequest>(
+        new BoundedChannelOptions(100)
+        {
+            FullMode = BoundedChannelFullMode.Wait
+        }));
 
+builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
 // =====================================================
 // MEDIATR - CQRS
 // =====================================================
@@ -244,6 +266,8 @@ builder.Services.AddHybridCache(options =>
 builder.Services.AddValidatorsFromAssembly(
     typeof(EnrollStudentValidator).Assembly
 );
+
+
 
 
 //=======================================================
@@ -321,8 +345,11 @@ builder.Host.UseDefaultServiceProvider(options =>
 });
 
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
+app.MapHub<TmsHub>("/hubs/tms");
 
 // =====================================================
 // GLOBAL EXCEPTION HANDLER

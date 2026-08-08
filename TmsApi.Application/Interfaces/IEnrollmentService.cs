@@ -31,4 +31,9 @@ public interface IEnrollmentService
     Task<List<Enrollment>> GetByStudentIdAsync(
         int studentId,
         CancellationToken ct);
+        // status
+    Task<EnrollmentResponseDto?> ApproveAsync(
+        int courseId,
+        int id,
+        CancellationToken ct);
 }

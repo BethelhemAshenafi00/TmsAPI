@@ -58,7 +58,8 @@ public class EnrollmentService(
         {
             CourseId = courseId,
             StudentId = request.StudentId,
-            EnrolledAt = DateTime.UtcNow
+            EnrolledAt = DateTime.UtcNow,
+            Status = "Pending"
         };
 
         context.Enrollments.Add(enrollment);
@@ -115,5 +116,33 @@ public class EnrollmentService(
             .Include(e => e.Course)
             .Where(e => e.StudentId == studentId)
             .ToListAsync(ct);
+    }
+
+    // =========================
+    // APPROVE ENROLLMENT
+    // =========================
+    public async Task<EnrollmentResponseDto?> ApproveAsync(
+        int courseId,
+        int id,
+        CancellationToken ct)
+    {
+        var enrollment = await context.Enrollments
+            .FirstOrDefaultAsync(e => e.Id == id && e.CourseId == courseId, ct);
+
+        if (enrollment is null)
+            return null;
+
+        if (enrollment.Status == "Approved")
+            return null;
+
+        enrollment.Status = "Approved";
+        await context.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Approved enrollment {EnrollmentId} for Course {CourseId}",
+            enrollment.Id,
+            courseId);
+
+        return await GetByIdAsync(courseId, id, ct);
     }
 }
