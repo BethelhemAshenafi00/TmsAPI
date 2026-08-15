@@ -268,6 +268,10 @@ builder.Services.AddValidatorsFromAssembly(
 );
 
 
+var allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>() 
+    ?? new[] { "http://localhost:4200" };
 
 
 //=======================================================
@@ -280,7 +284,9 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:4200")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials() // Required for HttpOnly cookies in Session 2
+              .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
     });
 });
 
@@ -366,6 +372,8 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.UseRouting();
+
+app.UseCors("TmsClient");
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 
