@@ -79,11 +79,13 @@ public class EnrollmentController(
     [EndpointDescription("Returns all students enrolled in the specified course.")]
     public async Task<IActionResult> GetCourseEnrollments(
         int courseId,
+        [FromQuery] string? status,
         CancellationToken ct)
-    {
-        var result = await enrollmentService.GetByCourseAsync(
-            courseId,
-            ct);
+        {
+            var result = await enrollmentService.GetByCourseAsync(
+                courseId,
+                status,
+                ct);
 
         return Ok(result);
     }

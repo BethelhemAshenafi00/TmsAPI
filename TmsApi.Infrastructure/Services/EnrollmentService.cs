@@ -15,35 +15,45 @@ public class EnrollmentService(
     // GET BY ID (DTO projection)
     // =========================
     public Task<EnrollmentResponseDto?> GetByIdAsync(
-        int courseId,
-        int id,
-        CancellationToken ct) =>
-        context.Enrollments
-            .AsNoTracking()
-            .Where(e => e.Id == id && e.CourseId == courseId)
-            .Select(e => new EnrollmentResponseDto(
-                e.Id,
-                e.CourseId,
-                e.StudentId,
-                e.EnrolledAt))
-            .FirstOrDefaultAsync(ct);
+    int courseId,
+    int id,
+    CancellationToken ct) =>
+    context.Enrollments
+        .AsNoTracking()
+        .Where(e => e.Id == id && e.CourseId == courseId)
+        .Select(e => new EnrollmentResponseDto(
+            e.Id,
+            e.CourseId,
+            e.StudentId,
+            e.Student.Name,
+            e.Course.Title,
+            e.Status,
+            e.EnrolledAt))
+        .FirstOrDefaultAsync(ct);
 
 
     // =========================
     // GET ALL BY COURSE
     // =========================
     public Task<List<EnrollmentResponseDto>> GetByCourseAsync(
-        int courseId,
-        CancellationToken ct) =>
-        context.Enrollments
-            .AsNoTracking()
-            .Where(e => e.CourseId == courseId)
-            .Select(e => new EnrollmentResponseDto(
-                e.Id,
-                e.CourseId,
-                e.StudentId,
-                e.EnrolledAt))
-            .ToListAsync(ct);
+    int courseId,
+    string? status = null,
+    CancellationToken ct = default) =>
+    context.Enrollments
+        .AsNoTracking()
+        .Where(e =>
+            e.CourseId == courseId &&
+            (string.IsNullOrEmpty(status) ||
+             e.Status.ToLower() == status.ToLower()))
+        .Select(e => new EnrollmentResponseDto(
+            e.Id,
+            e.CourseId,
+            e.StudentId,
+            e.Student.Name,
+            e.Course.Title,
+            e.Status,
+            e.EnrolledAt))
+        .ToListAsync(ct);
 
 
     // =========================
@@ -132,14 +142,36 @@ public class EnrollmentService(
         if (enrollment is null)
             return null;
 
-        if (enrollment.Status == "Approved")
-            return null;
-
         enrollment.Status = "Approved";
         await context.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Approved enrollment {EnrollmentId} for Course {CourseId}",
+            enrollment.Id,
+            courseId);
+
+        return await GetByIdAsync(courseId, id, ct);
+    }
+
+    // =========================
+    // REJECT ENROLLMENT
+    // =========================
+    public async Task<EnrollmentResponseDto?> RejectAsync(
+        int courseId,
+        int id,
+        CancellationToken ct)
+    {
+        var enrollment = await context.Enrollments
+            .FirstOrDefaultAsync(e => e.Id == id && e.CourseId == courseId, ct);
+
+        if (enrollment is null)
+            return null;
+
+        enrollment.Status = "Rejected";
+        await context.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Rejected enrollment {EnrollmentId} for Course {CourseId}",
             enrollment.Id,
             courseId);
 

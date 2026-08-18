@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
+using Microsoft.AspNetCore.Antiforgery;
+
 using TmsApi.Api.Notifications;
 using TmsApi.Application.Notifications;
 using TmsApi.Api.ExceptionHandlers;
@@ -186,6 +188,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 });
+
 // =====================================================
 // AUTHENTICATION
 // =====================================================
@@ -328,6 +331,12 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<AuditLogFilter>();
 });
 
+// Register Antiforgery service matching Angular's expected header convention
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+});
 
 // =====================================================
 // OPTIONS PATTERN + VALIDATION
@@ -381,6 +390,24 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
+// Add middleware to append readable XSRF-TOKEN cookie for authenticated sessions
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true || context.Request.Cookies.ContainsKey("tms_auth"))
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+        var tokens = antiforgery.GetAndStoreTokens(context);
+
+        context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
+        {
+            HttpOnly = false, // MUST be false so Angular JavaScript can read it!
+            Secure = !app.Environment.IsDevelopment(),
+            SameSite = SameSiteMode.Strict
+        });
+    }
+
+    await next(context);
+});
 
 // =====================================================
 // API VERSION 1 DEPRECATION

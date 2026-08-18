@@ -17,7 +17,8 @@ public interface IEnrollmentService
 
     Task<List<EnrollmentResponseDto>> GetByCourseAsync(
         int courseId,
-        CancellationToken ct);
+        string? status = null,
+        CancellationToken ct = default);
 
     Task<bool> ExistsAsync(
         int studentId,
