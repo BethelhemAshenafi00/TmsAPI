@@ -1,47 +1,52 @@
 using Asp.Versioning;
 using FluentValidation;
 using MediatR;
+
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.DependencyInjection;
+
 using Scalar.AspNetCore;
 
-using Microsoft.AspNetCore.Antiforgery;
+using System.Threading.Channels;
+using System.Threading.RateLimiting;
 
-using TmsApi.Api.Notifications;
-using TmsApi.Application.Notifications;
+using Microsoft.AspNetCore.RateLimiting;
+
 using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
-using TmsApi.Api.Middlewares;
-
-using System.Threading.Channels;
-using TmsApi.Infrastructure.Workers;
 using TmsApi.Api.Hubs;
-
-using Microsoft.AspNetCore.SignalR;
-using TmsApi.Application.Hubs;
-
-
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.AspNetCore.Mvc;
+using TmsApi.Api.Middlewares;
+using TmsApi.Api.Notifications;
 using TmsApi.Api.RateLimiting;
 
 using TmsApi.Application;
 using TmsApi.Application.Behaviors;
-using TmsApi.Application.Transcripts;
 using TmsApi.Application.Enrollments.Commands;
+using TmsApi.Application.Hubs;
 using TmsApi.Application.Interfaces;
+using TmsApi.Application.Notifications;
+using TmsApi.Application.Transcripts;
 
 using TmsApi.Domain.Entities;
 
 using TmsApi.Infrastructure.Persistence;
-using TmsApi.Infrastructure.Transcripts;
 using TmsApi.Infrastructure.Services;
+using TmsApi.Infrastructure.Transcripts;
+using TmsApi.Infrastructure.Workers;
 
-using Microsoft.Extensions.Caching.Hybrid;
+
+// =====================================================
+// CREATE BUILDER
+// =====================================================
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 // =====================================================
 // API VERSIONING + OPENAPI
@@ -58,6 +63,7 @@ builder.Services.AddOpenApi("v2", options =>
     options.ShouldInclude = description =>
         description.GroupName == "v2";
 });
+
 
 builder.Services
     .AddApiVersioning(options =>
@@ -81,9 +87,9 @@ builder.Services
     });
 
 
-//======================================================
-// Configure the global tier-aware limiter
-//======================================================
+// =====================================================
+// RATE LIMITING
+// =====================================================
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -103,7 +109,7 @@ builder.Services.AddRateLimiter(options =>
                                 new TokenBucketRateLimiterOptions
                                 {
                                     TokenLimit = 200,
-                                    TokensPerPeriod = 100,
+                                    TokensPerPeriod = 200,
                                     ReplenishmentPeriod =
                                         TimeSpan.FromSeconds(10),
                                     QueueLimit = 0,
@@ -151,7 +157,8 @@ builder.Services.AddRateLimiter(options =>
                 MetadataName.RetryAfter,
                 out var ts))
         {
-            retryAfter = ((int)ts.TotalSeconds).ToString();
+            retryAfter =
+                ((int)ts.TotalSeconds).ToString();
         }
 
         context.HttpContext.Response.Headers.RetryAfter =
@@ -166,11 +173,15 @@ builder.Services.AddRateLimiter(options =>
                 Title = "Rate limit exceeded",
                 Detail =
                     $"Too many requests. Retry after {retryAfter} seconds.",
-                Status = StatusCodes.Status429TooManyRequests,
-                Type = "https://tms.local/errors/rate_limit_exceeded"
+                Status =
+                    StatusCodes.Status429TooManyRequests,
+                Type =
+                    "https://tms.local/errors/rate_limit_exceeded"
             },
             ct);
     };
+
+
     options.AddConcurrencyLimiter("transcripts", opt =>
     {
         opt.PermitLimit = 5;
@@ -178,16 +189,18 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueProcessingOrder =
             QueueProcessingOrder.OldestFirst;
     });
+
+
     options.AddTokenBucketLimiter("search", opt =>
-{
-    opt.TokenLimit = 10;
-    opt.TokensPerPeriod = 5;
-    opt.ReplenishmentPeriod =
-        TimeSpan.FromSeconds(10);
-    opt.QueueLimit = 2;
+    {
+        opt.TokenLimit = 10;
+        opt.TokensPerPeriod = 5;
+        opt.ReplenishmentPeriod =
+            TimeSpan.FromSeconds(10);
+        opt.QueueLimit = 2;
+    });
 });
 
-});
 
 // =====================================================
 // AUTHENTICATION
@@ -195,8 +208,13 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services
     .AddAuthentication("Training")
-    .AddScheme<AuthenticationSchemeOptions,
-        TrainingAuthHandler>("Training", null);
+    .AddScheme<
+        AuthenticationSchemeOptions,
+        TrainingAuthHandler
+    >(
+        "Training",
+        null
+    );
 
 
 // =====================================================
@@ -212,7 +230,8 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("TmsDatabase")
+        builder.Configuration
+            .GetConnectionString("TmsDatabase")
     ));
 
 
@@ -226,17 +245,29 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
 builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
+
+
 builder.Services.AddSingleton<
     ITranscriptStatusStore,
-    InMemoryTranscriptStatusStore>();
+    InMemoryTranscriptStatusStore
+>();
+
+
 builder.Services.AddSingleton(
     Channel.CreateBounded<TranscriptRequest>(
         new BoundedChannelOptions(100)
         {
             FullMode = BoundedChannelFullMode.Wait
-        }));
+        })
+);
 
-builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
+
+builder.Services.AddSingleton<
+    ITranscriptNotificationService,
+    SignalRTranscriptNotificationService
+>();
+
+
 // =====================================================
 // MEDIATR - CQRS
 // =====================================================
@@ -244,22 +275,26 @@ builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptN
 builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(
         typeof(EnrollStudentHandler).Assembly
-    ));
+    )
+);
 
 
-//======================================================
-// HYBRID CATCH
-//======================================================
+// =====================================================
+// HYBRID CACHE
+// =====================================================
 
 builder.Services.AddHybridCache(options =>
 {
-    options.DefaultEntryOptions = new HybridCacheEntryOptions
-    {
-        Expiration = TimeSpan.FromMinutes(10),
-        LocalCacheExpiration = TimeSpan.FromMinutes(2)
-    };
-});
+    options.DefaultEntryOptions =
+        new HybridCacheEntryOptions
+        {
+            Expiration =
+                TimeSpan.FromMinutes(10),
 
+            LocalCacheExpiration =
+                TimeSpan.FromMinutes(2)
+        };
+});
 
 
 // =====================================================
@@ -271,29 +306,34 @@ builder.Services.AddValidatorsFromAssembly(
 );
 
 
-var allowedOrigins = builder.Configuration
-    .GetSection("AllowedOrigins")
-    .Get<string[]>() 
-    ?? new[] { "http://localhost:4200" };
+// =====================================================
+// CORS
+// =====================================================
 
+var allowedOrigins =
+    builder.Configuration
+        .GetSection("AllowedOrigins")
+        .Get<string[]>()
+        ?? new[]
+        {
+            "http://localhost:4200"
+        };
 
-//=======================================================
-//  Handle CORS
-//=======================================================
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Angular", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials() // Required for HttpOnly cookies in Session 2
-              .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+            .SetPreflightMaxAge(
+                TimeSpan.FromMinutes(10)
+            );
     });
 });
-
-
 
 
 // =====================================================
@@ -315,9 +355,12 @@ builder.Services.AddTransient(
 
 // =====================================================
 // GLOBAL EXCEPTION HANDLING
+// RFC 7807 PROBLEMD DETAILS
 // =====================================================
 
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddExceptionHandler<
+    GlobalExceptionHandler
+>();
 
 builder.Services.AddProblemDetails();
 
@@ -331,12 +374,16 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<AuditLogFilter>();
 });
 
-// Register Antiforgery service matching Angular's expected header convention
+
+// =====================================================
+// ANTIFORGERY / XSRF
+// =====================================================
 
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-XSRF-TOKEN";
 });
+
 
 // =====================================================
 // OPTIONS PATTERN + VALIDATION
@@ -360,58 +407,118 @@ builder.Host.UseDefaultServiceProvider(options =>
 });
 
 
+// =====================================================
+// SIGNALR
+// =====================================================
+
 builder.Services.AddSignalR();
+
+
+// =====================================================
+// BUILD APPLICATION
+// =====================================================
 
 var app = builder.Build();
 
-app.MapHub<TmsHub>("/hubs/tms");
+
+// =====================================================
+// STATUS CODE PAGES
+// Converts empty 4xx/5xx responses into ProblemDetails
+// =====================================================
+
+app.UseStatusCodePages();
+
 
 // =====================================================
 // GLOBAL EXCEPTION HANDLER
-// MUST BE BEFORE CONTROLLERS
 // =====================================================
 
 app.UseExceptionHandler();
 
 
 // =====================================================
-// REQUEST PIPELINE
+// HTTPS
 // =====================================================
 
 app.UseHttpsRedirection();
 
+
+// =====================================================
+// ROUTING
+// =====================================================
+
 app.UseRouting();
 
-app.UseCors("TmsClient");
+
+// =====================================================
+// CORS
+// =====================================================
+
+app.UseCors("Angular");
+
+
+// =====================================================
+// REQUEST LOGGING
+// =====================================================
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 
+
+// =====================================================
+// AUTHENTICATION
+// =====================================================
+
 app.UseAuthentication();
+
+
+// =====================================================
+// AUTHORIZATION
+// =====================================================
 
 app.UseAuthorization();
 
-// Add middleware to append readable XSRF-TOKEN cookie for authenticated sessions
+
+// =====================================================
+// XSRF TOKEN COOKIE
+// =====================================================
+
 app.Use(async (context, next) =>
 {
-    if (context.User.Identity?.IsAuthenticated == true || context.Request.Cookies.ContainsKey("tms_auth"))
+    if (
+        context.User.Identity?.IsAuthenticated == true ||
+        context.Request.Cookies.ContainsKey("tms_auth")
+    )
     {
-        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
-        var tokens = antiforgery.GetAndStoreTokens(context);
+        var antiforgery =
+            context.RequestServices
+                .GetRequiredService<IAntiforgery>();
 
-        context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
-        {
-            HttpOnly = false, // MUST be false so Angular JavaScript can read it!
-            Secure = !app.Environment.IsDevelopment(),
-            SameSite = SameSiteMode.Strict
-        });
+        var tokens =
+            antiforgery.GetAndStoreTokens(context);
+
+
+        context.Response.Cookies.Append(
+            "XSRF-TOKEN",
+            tokens.RequestToken!,
+            new CookieOptions
+            {
+                HttpOnly = false,
+
+                Secure =
+                    !app.Environment.IsDevelopment(),
+
+                SameSite =
+                    SameSiteMode.Strict
+            }
+        );
     }
 
     await next(context);
 });
 
+
 // =====================================================
 // API VERSION 1 DEPRECATION
-// Must be before MapControllers()
 // =====================================================
 
 app.UseMiddleware<V1DeprecationMiddleware>();
@@ -435,35 +542,27 @@ app.MapScalarApiReference(options =>
         .WithTheme(ScalarTheme.DeepSpace)
         .WithDefaultHttpClient(
             ScalarTarget.CSharp,
-            ScalarClient.HttpClient);
+            ScalarClient.HttpClient
+        );
 
     options
         .AddDocument("v1", "API Version 1.0")
         .AddDocument("v2", "API Version 2.0");
 });
 
-// app.MapHealthChecks("/health/live")
-//     .DisableRateLimiting();
-
-// app.MapHealthChecks("/health/ready")
-//     .DisableRateLimiting();
-
-
-// ====================================================
-// Allow Angular
-// ====================================================
-
-app.UseCors("Angular");
 
 // =====================================================
-// STATUS CODE PAGES
+// SIGNALR HUB
+// IMPORTANT: CORS MUST MATCH "Angular"
 // =====================================================
 
-app.UseStatusCodePages();
+app.MapHub<TmsHub>("/hubs/tms")
+   .RequireCors("Angular");
 
-//=======================================================
+
+// =====================================================
 // RATE LIMITING
-//=======================================================
+// =====================================================
 
 app.UseRateLimiter();
 

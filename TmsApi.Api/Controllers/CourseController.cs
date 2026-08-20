@@ -118,4 +118,43 @@ public class CoursesController(
 
         return Ok(result);
     }
+    // =========================
+// DELETE COURSE
+// =========================
+[HttpDelete("{id:int}")]
+[ProducesResponseType(StatusCodes.Status204NoContent)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+[EndpointSummary("Delete a course")]
+[EndpointDescription(
+    "Deletes a course. Returns 409 if the course has active enrollments."
+)]
+public async Task<IActionResult> DeleteCourse(
+    int id,
+    CancellationToken ct)
+{
+    try
+    {
+        var deleted = await courseService.DeleteAsync(id, ct);
+
+        if (!deleted)
+            return NotFound(new ProblemDetails
+            {
+                Title = "Course not found",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"Course with ID {id} was not found."
+            });
+
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new ProblemDetails
+        {
+            Title = "Course cannot be deleted",
+            Status = StatusCodes.Status409Conflict,
+            Detail = ex.Message
+        });
+    }
+}
 }

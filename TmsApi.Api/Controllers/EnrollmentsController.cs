@@ -67,7 +67,7 @@ public class EnrollmentsController(
     // Approve enrollment and broadcast status through SignalR
     [HttpPost]
     public async Task<IActionResult> Approve(
-        string id,
+        int id,
         CancellationToken ct)
     {
 

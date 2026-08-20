@@ -49,6 +49,22 @@ public class CourseService : ICourseService
 
         return (await GetByIdAsync(course.Id, ct))!;
     }
+    // =========================
+    // DELETE
+    // =========================
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct)
+    {
+        var course = await _context.Courses.FindAsync(new object[] { id }, ct);
+        if (course == null)
+        {
+            return false;
+        }
+
+        _context.Courses.Remove(course);
+        await _context.SaveChangesAsync(ct);
+        return true;
+    }
+    
 public async Task<bool> CodeExistsAsync(string code, CancellationToken ct)
 {
     return await _context.Courses
