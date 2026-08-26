@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
+using TmsApi.Infrastructure.Identity;
 
 using Scalar.AspNetCore;
 
@@ -235,6 +237,40 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
     ));
 
 
+// =====================================================
+// configure Identity Core with enterprise password and lockout policies
+// =====================================================
+
+builder.Services
+    .AddIdentityCore<TmsUser>(options =>
+    {
+        // ==============================================
+        // ENTERPRISE PASSWORD POLICY
+        // ==============================================
+
+        options.Password.RequiredLength = 12;
+
+        options.Password.RequireUppercase = true;
+
+        options.Password.RequireDigit = true;
+
+        options.Password.RequireNonAlphanumeric = true;
+
+
+        // ==============================================
+        // BRUTE-FORCE LOCKOUT PROTECTION
+        // ==============================================
+
+        options.Lockout.MaxFailedAccessAttempts = 5;
+
+        options.Lockout.DefaultLockoutTimeSpan =
+            TimeSpan.FromMinutes(15);
+
+        options.Lockout.AllowedForNewUsers = true;
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<TmsDbContext>();
+    
 // =====================================================
 // APPLICATION SERVICES
 // =====================================================

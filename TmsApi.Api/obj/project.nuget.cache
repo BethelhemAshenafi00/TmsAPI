@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "dgSpecHash": "BQrI8QCEHGE=",
-  "success": false,
+  "dgSpecHash": "Xbgq3JYcZ2I=",
+  "success": true,
   "projectFilePath": "C:\\Users\\miki computer\\TmsApi\\TmsApi.Api\\TmsApi.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\miki computer\\.nuget\\packages\\asp.versioning.abstractions\\10.0.0\\asp.versioning.abstractions.10.0.0.nupkg.sha512",
@@ -24,11 +24,11 @@
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.codeanalysis.csharp.workspaces\\5.0.0\\microsoft.codeanalysis.csharp.workspaces.5.0.0.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.codeanalysis.workspaces.common\\5.0.0\\microsoft.codeanalysis.workspaces.common.5.0.0.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.codeanalysis.workspaces.msbuild\\5.0.0\\microsoft.codeanalysis.workspaces.msbuild.5.0.0.nupkg.sha512",
-    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.10\\microsoft.entityframeworkcore.10.0.10.nupkg.sha512",
-    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.10\\microsoft.entityframeworkcore.abstractions.10.0.10.nupkg.sha512",
-    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.10\\microsoft.entityframeworkcore.analyzers.10.0.10.nupkg.sha512",
+    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.11\\microsoft.entityframeworkcore.10.0.11.nupkg.sha512",
+    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.11\\microsoft.entityframeworkcore.abstractions.10.0.11.nupkg.sha512",
+    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.11\\microsoft.entityframeworkcore.analyzers.10.0.11.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.design\\10.0.10\\microsoft.entityframeworkcore.design.10.0.10.nupkg.sha512",
-    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.relational\\10.0.10\\microsoft.entityframeworkcore.relational.10.0.10.nupkg.sha512",
+    "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.relational\\10.0.11\\microsoft.entityframeworkcore.relational.10.0.11.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.entityframeworkcore.tools\\10.0.9\\microsoft.entityframeworkcore.tools.10.0.9.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.extensions.apidescription.server\\10.0.0\\microsoft.extensions.apidescription.server.10.0.0.nupkg.sha512",
     "C:\\Users\\miki computer\\.nuget\\packages\\microsoft.extensions.caching.hybrid\\10.8.0\\microsoft.extensions.caching.hybrid.10.8.0.nupkg.sha512",
@@ -65,17 +65,6 @@
       "warningLevel": 1,
       "filePath": "C:\\Users\\miki computer\\TmsApi\\TmsApi.Api\\TmsApi.Api.csproj",
       "libraryId": "Microsoft.AspNetCore.SignalR",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    },
-    {
-      "code": "NU1605",
-      "level": "Error",
-      "message": "Warning As Error: Detected package downgrade: Microsoft.EntityFrameworkCore.Relational from 10.0.11 to 10.0.10. Reference the package directly from the project to select a different version. \r\n TmsApi.Api -> TmsApi.Infrastructure -> Microsoft.AspNetCore.Identity.EntityFrameworkCore 10.0.11 -> Microsoft.EntityFrameworkCore.Relational (>= 10.0.11) \r\n TmsApi.Api -> TmsApi.Infrastructure -> Microsoft.EntityFrameworkCore.Relational (>= 10.0.10)",
-      "projectPath": "C:\\Users\\miki computer\\TmsApi\\TmsApi.Api\\TmsApi.Api.csproj",
-      "filePath": "C:\\Users\\miki computer\\TmsApi\\TmsApi.Api\\TmsApi.Api.csproj",
-      "libraryId": "Microsoft.EntityFrameworkCore.Relational",
       "targetGraphs": [
         "net10.0"
       ]
