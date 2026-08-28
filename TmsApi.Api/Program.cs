@@ -2,6 +2,11 @@ using Asp.Versioning;
 using FluentValidation;
 using MediatR;
 
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using TmsApi.Infrastructure.Services;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
@@ -38,7 +43,6 @@ using TmsApi.Application.Transcripts;
 using TmsApi.Domain.Entities;
 
 using TmsApi.Infrastructure.Persistence;
-using TmsApi.Infrastructure.Services;
 using TmsApi.Infrastructure.Transcripts;
 using TmsApi.Infrastructure.Workers;
 
@@ -208,22 +212,12 @@ builder.Services.AddRateLimiter(options =>
 // AUTHENTICATION
 // =====================================================
 
-builder.Services
-    .AddAuthentication("Training")
-    .AddScheme<
-        AuthenticationSchemeOptions,
-        TrainingAuthHandler
-    >(
-        "Training",
-        null
-    );
-
 
 // =====================================================
 // AUTHORIZATION
 // =====================================================
 
-builder.Services.AddAuthorization();
+
 
 
 // =====================================================
@@ -282,6 +276,39 @@ builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
 builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
 
+builder.Services.AddScoped<TokenService>();
+
+
+// =====================================================
+// Configure JWT Authentication
+// =====================================================
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters{
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+                    )
+            };
+    });
+
+    builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<
     ITranscriptStatusStore,
@@ -297,6 +324,10 @@ builder.Services.AddSingleton(
         })
 );
 
+
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<
     ITranscriptNotificationService,
@@ -480,6 +511,37 @@ app.UseHttpsRedirection();
 
 
 // =====================================================
+// OPENAPI
+// =====================================================
+
+app.MapOpenApi();
+
+
+// =====================================================
+// SCALAR API DOCUMENTATION
+// =====================================================
+
+app.MapScalarApiReference(options =>
+{
+    options
+        .WithTitle("TMS API Reference")
+        .WithTheme(ScalarTheme.DeepSpace)
+        .WithDefaultHttpClient(
+            ScalarTarget.CSharp,
+            ScalarClient.HttpClient
+        );
+
+    options
+        .AddDocument("v1", "API Version 1.0")
+        .AddDocument("v2", "API Version 2.0");
+});
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+// =====================================================
 // ROUTING
 // =====================================================
 
@@ -560,31 +622,6 @@ app.Use(async (context, next) =>
 app.UseMiddleware<V1DeprecationMiddleware>();
 
 
-// =====================================================
-// OPENAPI
-// =====================================================
-
-app.MapOpenApi();
-
-
-// =====================================================
-// SCALAR API DOCUMENTATION
-// =====================================================
-
-app.MapScalarApiReference(options =>
-{
-    options
-        .WithTitle("TMS API Reference")
-        .WithTheme(ScalarTheme.DeepSpace)
-        .WithDefaultHttpClient(
-            ScalarTarget.CSharp,
-            ScalarClient.HttpClient
-        );
-
-    options
-        .AddDocument("v1", "API Version 1.0")
-        .AddDocument("v2", "API Version 2.0");
-});
 
 
 // =====================================================

@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("d1755de8-f931-4cf4-9a55-c8915ed957c2")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("TmsApi.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fb5d41dd5a29d4141626cadd214ee46c789a78f3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d925a7077a853db69b7686c9d4bc33168a4a91b0")]
 [assembly: System.Reflection.AssemblyProductAttribute("TmsApi.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TmsApi.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
