@@ -1,7 +1,8 @@
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Infrastructure.Persistence;
+using TmsApi.Infrastructure.Identity;
 using TmsApi.Application.DTOs;
-using TmsApi.Domain.Entities;
 using TmsApi.Application.Interfaces;
 
 namespace TmsApi.Infrastructure.Services;
@@ -9,31 +10,105 @@ namespace TmsApi.Infrastructure.Services;
 public class CourseService : ICourseService
 {
     private readonly TmsDbContext _context;
+    private readonly UserManager<TmsUser> _userManager;
 
-    public CourseService(TmsDbContext context)
+    public CourseService(TmsDbContext context, UserManager<TmsUser> userManager)
     {
         _context = context;
+        _userManager = userManager;
     }
 
     // =========================
-    // GET BY ID (DTO OUTPUT)
+    // PRIVATE: resolve instructor info from InstructorId
+    // =========================
+
+    private async Task<(string? Name, string? Email)> GetInstructorInfoAsync(string? instructorId)
+    {
+        if (string.IsNullOrEmpty(instructorId))
+            return (null, null);
+
+        var user = await _userManager.FindByIdAsync(instructorId);
+        if (user is null)
+            return (null, null);
+
+        return ($"{user.FirstName} {user.LastName}".Trim(), user.Email);
+    }
+
+    // =========================
+    // GET BY ID
     // =========================
     public async Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct)
     {
-        return await _context.Courses
+        var course = await _context.Courses
             .AsNoTracking()
-            .Where(c => c.Id == id)
-            .Select(c => new CourseResponseDto(
-                c.Id,
-                c.Code,
-                c.Title,
-                c.MaxCapacity,
-                c.Enrollments.Count))
-            .FirstOrDefaultAsync(ct);
+            .Include(c => c.Enrollments)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (course is null)
+            return null;
+
+        var (name, email) = await GetInstructorInfoAsync(course.InstructorId);
+
+        return new CourseResponseDto(
+            course.Id,
+            course.Code,
+            course.Title,
+            course.MaxCapacity,
+            course.Enrollments.Count,
+            course.InstructorId,
+            name,
+            email);
     }
 
     // =========================
-    // CREATE (DTO INPUT → DTO OUTPUT)
+    // GET BY CODE
+    // =========================
+    public async Task<CourseResponseDto?> GetByCodeAsync(string code, CancellationToken ct)
+    {
+        var course = await _context.Courses
+            .AsNoTracking()
+            .Include(c => c.Enrollments)
+            .FirstOrDefaultAsync(c => c.Code == code, ct);
+
+        if (course is null)
+            return null;
+
+        var (name, email) = await GetInstructorInfoAsync(course.InstructorId);
+
+        return new CourseResponseDto(
+            course.Id,
+            course.Code,
+            course.Title,
+            course.MaxCapacity,
+            course.Enrollments.Count,
+            course.InstructorId,
+            name,
+            email);
+    }
+
+    // =========================
+    // GET ALL
+    // =========================
+    public async Task<List<CourseResponseDto>> GetAllAsync(CancellationToken ct)
+    {
+        var courses = await _context.Courses
+            .AsNoTracking()
+            .Include(c => c.Enrollments)
+            .ToListAsync(ct);
+
+        var result = new List<CourseResponseDto>(courses.Count);
+        foreach (var c in courses)
+        {
+            var (name, email) = await GetInstructorInfoAsync(c.InstructorId);
+            result.Add(new CourseResponseDto(
+                c.Id, c.Code, c.Title, c.MaxCapacity,
+                c.Enrollments.Count, c.InstructorId, name, email));
+        }
+        return result;
+    }
+
+    // =========================
+    // CREATE
     // =========================
     public async Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct)
     {
@@ -41,7 +116,8 @@ public class CourseService : ICourseService
         {
             Code = request.Code,
             Title = request.Title,
-            MaxCapacity = request.MaxCapacity
+            MaxCapacity = request.MaxCapacity,
+            InstructorId = request.InstructorId
         };
 
         _context.Courses.Add(course);
@@ -49,9 +125,49 @@ public class CourseService : ICourseService
 
         return (await GetByIdAsync(course.Id, ct))!;
     }
+
     // =========================
-    // DELETE
+    // UPDATE (partial)
     // =========================
+    public async Task<CourseResponseDto?> UpdateAsync(int id, UpdateCourseRequest request, CancellationToken ct)
+    {
+        var course = await _context.Courses
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (course is null)
+            return null;
+
+        if (request.Title is not null)
+            course.Title = request.Title;
+
+        if (request.MaxCapacity.HasValue)
+            course.MaxCapacity = request.MaxCapacity.Value;
+
+        if (request.InstructorId is not null)
+            course.InstructorId = request.InstructorId;
+
+        await _context.SaveChangesAsync(ct);
+
+        return await GetByIdAsync(id, ct);
+    }
+
+    // =========================
+    // ASSIGN INSTRUCTOR
+    // =========================
+    public async Task<bool> AssignInstructorAsync(int courseId, string instructorId, CancellationToken ct)
+    {
+        var course = await _context.Courses
+            .FirstOrDefaultAsync(c => c.Id == courseId, ct);
+
+        if (course is null)
+            return false;
+
+        course.InstructorId = instructorId;
+        await _context.SaveChangesAsync(ct);
+
+        return true;
+    }
+
     // =========================
     // DELETE
     // =========================
@@ -61,38 +177,40 @@ public class CourseService : ICourseService
             .Include(c => c.Enrollments)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
 
-        if (course == null)
-        {
+        if (course is null)
             return false;
-        }
 
-        // Do not allow deletion if students are enrolled
         if (course.Enrollments.Any())
-        {
             throw new InvalidOperationException(
                 "Cannot delete course because it has active student enrollments.");
-        }
 
         _context.Courses.Remove(course);
-
         await _context.SaveChangesAsync(ct);
 
         return true;
     }
 
+    // =========================
+    // CODE EXISTS
+    // =========================
     public async Task<bool> CodeExistsAsync(string code, CancellationToken ct)
     {
         return await _context.Courses
             .AsNoTracking()
             .AnyAsync(c => c.Code == code, ct);
     }
+
+    // =========================
+    // PAGED LIST
+    // =========================
     public async Task<PagedResponse<CourseResponseDto>> GetCoursesAsync(
         PagedRequest request,
         CancellationToken ct)
     {
-        IQueryable<Course> query = _context.Courses.AsNoTracking();
+        IQueryable<Course> query = _context.Courses
+            .AsNoTracking()
+            .Include(c => c.Enrollments);
 
-        // Filtering
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             query = query.Where(c =>
@@ -100,10 +218,8 @@ public class CourseService : ICourseService
                 EF.Functions.ILike(c.Code, $"%{request.Search}%"));
         }
 
-        // Count BEFORE paging
         var totalCount = await query.CountAsync(ct);
 
-        // Sorting
         query = request.OrderBy switch
         {
             "Code" => request.Descending
@@ -119,17 +235,19 @@ public class CourseService : ICourseService
                 : query.OrderBy(c => c.Title)
         };
 
-        // Paging + Projection
-        var items = await query
+        var courses = await query
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(c => new CourseResponseDto(
-                c.Id,
-                c.Code,
-                c.Title,
-                c.MaxCapacity,
-                c.Enrollments.Count))
             .ToListAsync(ct);
+
+        var items = new List<CourseResponseDto>(courses.Count);
+        foreach (var c in courses)
+        {
+            var (name, email) = await GetInstructorInfoAsync(c.InstructorId);
+            items.Add(new CourseResponseDto(
+                c.Id, c.Code, c.Title, c.MaxCapacity,
+                c.Enrollments.Count, c.InstructorId, name, email));
+        }
 
         return new PagedResponse<CourseResponseDto>
         {
@@ -138,35 +256,5 @@ public class CourseService : ICourseService
             Page = request.Page,
             PageSize = request.PageSize
         };
-        throw new NotImplementedException();
-    }
-    public async Task<CourseResponseDto?> GetByCodeAsync(
-        string code,
-        CancellationToken ct)
-    {
-        return await _context.Courses
-            .AsNoTracking()
-            .Where(c => c.Code == code)
-            .Select(c => new CourseResponseDto(
-                c.Id,
-                c.Code,
-                c.Title,
-                c.MaxCapacity,
-                c.Enrollments.Count))
-            .FirstOrDefaultAsync(ct);
-    }
-    // Add this method inside your CourseService class
-    public async Task<List<CourseResponseDto>> GetAllAsync(
-        CancellationToken ct)
-    {
-        return await _context.Courses
-            .AsNoTracking()
-            .Select(c => new CourseResponseDto(
-                c.Id,
-                c.Code,
-                c.Title,
-                c.MaxCapacity,
-                c.Enrollments.Count))
-            .ToListAsync(ct);
     }
 }

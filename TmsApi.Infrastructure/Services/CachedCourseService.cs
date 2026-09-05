@@ -47,7 +47,10 @@ public class CachedCourseService(
                     course.Code,
                     course.Title,
                     course.MaxCapacity,
-                    course.EnrollmentCount);
+                    course.EnrollmentCount,
+                    course.InstructorId,
+                    course.InstructorName,
+                    course.InstructorEmail);
             },
             tags: [CacheKeys.CoursesTag],
             cancellationToken: ct);

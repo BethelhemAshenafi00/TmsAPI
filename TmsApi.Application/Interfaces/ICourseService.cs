@@ -7,8 +7,9 @@ public interface ICourseService
     Task<CourseResponseDto?> GetByIdAsync(
         int id,
         CancellationToken ct);
+
     Task<List<CourseResponseDto>> GetAllAsync(
-     CancellationToken ct);
+        CancellationToken ct);
 
     Task<CourseResponseDto?> GetByCodeAsync(
         string code,
@@ -17,6 +18,17 @@ public interface ICourseService
     Task<CourseResponseDto> CreateAsync(
         CreateCourseRequest request,
         CancellationToken ct);
+
+    Task<CourseResponseDto?> UpdateAsync(
+        int id,
+        UpdateCourseRequest request,
+        CancellationToken ct);
+
+    Task<bool> AssignInstructorAsync(
+        int courseId,
+        string instructorId,
+        CancellationToken ct);
+
     Task<bool> DeleteAsync(
         int id,
         CancellationToken ct);
@@ -28,4 +40,4 @@ public interface ICourseService
     Task<PagedResponse<CourseResponseDto>> GetCoursesAsync(
         PagedRequest request,
         CancellationToken ct);
-}
+}

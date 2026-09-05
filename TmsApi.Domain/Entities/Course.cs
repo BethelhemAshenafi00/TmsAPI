@@ -10,7 +10,9 @@ public class Course
 
     public int MaxCapacity { get; set; }
 
-    public ICollection<Enrollment> Enrollments { get; set; } = [];
-} 
+    /// <summary>FK to AspNetUsers (TmsUser). Null if no instructor is assigned.</summary>
+    public string? InstructorId { get; set; }
 
+    public ICollection<Enrollment> Enrollments { get; set; } = [];
+}
 

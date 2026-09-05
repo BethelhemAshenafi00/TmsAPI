@@ -3,8 +3,11 @@ using FluentValidation;
 using MediatR;
 
 using System.Text;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using TmsApi.Infrastructure.Services;
 
 using Microsoft.AspNetCore.Authentication;
@@ -31,6 +34,7 @@ using TmsApi.Api.Hubs;
 using TmsApi.Api.Middlewares;
 using TmsApi.Api.Notifications;
 using TmsApi.Api.RateLimiting;
+using TmsApi.Api.Authorization;
 
 using TmsApi.Application;
 using TmsApi.Application.Behaviors;
@@ -69,7 +73,6 @@ builder.Services.AddOpenApi("v2", options =>
     options.ShouldInclude = description =>
         description.GroupName == "v2";
 });
-
 
 builder.Services
     .AddApiVersioning(options =>
@@ -187,7 +190,6 @@ builder.Services.AddRateLimiter(options =>
             ct);
     };
 
-
     options.AddConcurrencyLimiter("transcripts", opt =>
     {
         opt.PermitLimit = 5;
@@ -195,7 +197,6 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueProcessingOrder =
             QueueProcessingOrder.OldestFirst;
     });
-
 
     options.AddTokenBucketLimiter("search", opt =>
     {
@@ -205,19 +206,18 @@ builder.Services.AddRateLimiter(options =>
             TimeSpan.FromSeconds(10);
         opt.QueueLimit = 2;
     });
+
+    // =================================================
+    // MODULE 11 - AUTH LOGIN RATE LIMITER
+    // =================================================
+
+    options.AddFixedWindowLimiter("AuthLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
 });
-
-
-// =====================================================
-// AUTHENTICATION
-// =====================================================
-
-
-// =====================================================
-// AUTHORIZATION
-// =====================================================
-
-
 
 
 // =====================================================
@@ -232,29 +232,19 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
 
 
 // =====================================================
-// configure Identity Core with enterprise password and lockout policies
+// IDENTITY
 // =====================================================
 
 builder.Services
     .AddIdentityCore<TmsUser>(options =>
     {
-        // ==============================================
-        // ENTERPRISE PASSWORD POLICY
-        // ==============================================
-
+        // Password policy
         options.Password.RequiredLength = 12;
-
         options.Password.RequireUppercase = true;
-
         options.Password.RequireDigit = true;
-
         options.Password.RequireNonAlphanumeric = true;
 
-
-        // ==============================================
-        // BRUTE-FORCE LOCKOUT PROTECTION
-        // ==============================================
-
+        // Lockout policy
         options.Lockout.MaxFailedAccessAttempts = 5;
 
         options.Lockout.DefaultLockoutTimeSpan =
@@ -264,7 +254,122 @@ builder.Services
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<TmsDbContext>();
-    
+
+
+// =====================================================
+// JWT AUTHENTICATION
+// =====================================================
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        // In development: auto-generate a stable key and persist it to user-secrets
+        // so the same key survives restarts. A new random key on every restart
+        // would invalidate all issued tokens.
+        jwtKey = Convert.ToBase64String(
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+
+        var userSecretsId = "d1755de8-f931-4cf4-9a55-c8915ed957c2";
+        var secretsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Microsoft", "UserSecrets", userSecretsId, "secrets.json");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(secretsPath)!);
+
+        var existing = File.Exists(secretsPath)
+            ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(
+                await File.ReadAllTextAsync(secretsPath))
+              ?? new Dictionary<string, object>()
+            : new Dictionary<string, object>();
+
+        existing["Jwt:Key"] = jwtKey;
+
+        await File.WriteAllTextAsync(
+            secretsPath,
+            System.Text.Json.JsonSerializer.Serialize(
+                existing,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+        Console.WriteLine(
+            "[Auth] Jwt:Key was not configured. A stable key has been generated " +
+            "and saved to user-secrets. It will be reused on subsequent runs.");
+    }
+    else
+    {
+        throw new InvalidOperationException(
+            "JWT configuration is missing: Jwt:Key. " +
+            "Set it via an environment variable or a secrets manager.");
+    }
+}
+var jwtIssuer =
+    builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException(
+        "JWT configuration is missing: Jwt:Issuer");
+
+var jwtAudience =
+    builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException(
+        "JWT configuration is missing: Jwt:Audience");
+
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        // Keep long-form ClaimTypes (e.g. ClaimTypes.Role) mapped correctly
+        // when reading tokens back. .NET 8+ defaults this to false, which
+        // breaks [Authorize(Roles = "...")] when roles were added via ClaimTypes.Role.
+        options.MapInboundClaims = true;
+
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtKey)
+                    ),
+
+                // Explicitly tell the validator which claim holds the role,
+                // so ClaimsPrincipal.IsInRole / [Authorize(Roles = "...")] work correctly.
+                RoleClaimType = System.Security.Claims.ClaimTypes.Role
+            };
+    });
+
+
+// =====================================================
+// AUTHORIZATION
+// =====================================================
+
+builder.Services.AddAuthorizationBuilder()
+
+    // Resource-based course authorization
+    .AddPolicy("CanEditCourse", policy =>
+    {
+        policy.Requirements.Add(
+            new CourseInstructorRequirement());
+    });
+
+
+// Register custom authorization handler
+builder.Services.AddSingleton<IAuthorizationHandler, CourseInstructorHandler>();
+
+
 // =====================================================
 // APPLICATION SERVICES
 // =====================================================
@@ -280,41 +385,13 @@ builder.Services.AddScoped<TokenService>();
 
 
 // =====================================================
-// Configure JWT Authentication
+// TRANSCRIPT SERVICES
 // =====================================================
-builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme =
-            JwtBearerDefaults.AuthenticationScheme;
-
-        options.DefaultChallengeScheme =
-            JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters{
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-                    )
-            };
-    });
-
-    builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<
     ITranscriptStatusStore,
     InMemoryTranscriptStatusStore
 >();
-
 
 builder.Services.AddSingleton(
     Channel.CreateBounded<TranscriptRequest>(
@@ -324,15 +401,38 @@ builder.Services.AddSingleton(
         })
 );
 
-
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
 builder.Services.AddSingleton<
     ITranscriptNotificationService,
     SignalRTranscriptNotificationService
 >();
+
+
+// =====================================================
+// OPENAPI / SWAGGER
+// =====================================================
+
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Enter an access token obtained from POST /api/auth/login.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecuritySchemeReference("Bearer", document, null),
+            new List<string>()
+        }
+    });
+});
 
 
 // =====================================================
@@ -386,7 +486,6 @@ var allowedOrigins =
             "http://localhost:4200"
         };
 
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Angular", policy =>
@@ -405,8 +504,6 @@ builder.Services.AddCors(options =>
 
 // =====================================================
 // MEDIATR PIPELINE BEHAVIORS
-// IMPORTANT: ORDER MATTERS
-// Logging FIRST -> Validation SECOND
 // =====================================================
 
 builder.Services.AddTransient(
@@ -422,7 +519,6 @@ builder.Services.AddTransient(
 
 // =====================================================
 // GLOBAL EXCEPTION HANDLING
-// RFC 7807 PROBLEMD DETAILS
 // =====================================================
 
 builder.Services.AddExceptionHandler<
@@ -453,7 +549,7 @@ builder.Services.AddAntiforgery(options =>
 
 
 // =====================================================
-// OPTIONS PATTERN + VALIDATION
+// PAYMENT OPTIONS
 // =====================================================
 
 builder.Services
@@ -486,14 +582,47 @@ builder.Services.AddSignalR();
 // =====================================================
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var userManager =
+        scope.ServiceProvider
+            .GetRequiredService<UserManager<TmsUser>>();
+
+    var roleManager =
+        scope.ServiceProvider
+            .GetRequiredService<RoleManager<IdentityRole>>();
+
+    await IdentitySeeder.SeedAsync(
+        userManager,
+        roleManager);
+}
+
+await EnsureBootstrapAdminAsync(app.Services, builder.Configuration);
 
 
 // =====================================================
 // STATUS CODE PAGES
-// Converts empty 4xx/5xx responses into ProblemDetails
 // =====================================================
 
-app.UseStatusCodePages();
+// Return JSON problem details for 4xx/5xx instead of the default HTML page.
+// This prevents the browser "Access Denied" page on 401/403 for API clients.
+app.UseStatusCodePages(async ctx =>
+{
+    ctx.HttpContext.Response.ContentType = "application/problem+json";
+    var status = ctx.HttpContext.Response.StatusCode;
+    await ctx.HttpContext.Response.WriteAsJsonAsync(new
+    {
+        type   = $"https://httpstatuses.io/{status}",
+        title  = status switch
+        {
+            401 => "Unauthorized",
+            403 => "Forbidden",
+            404 => "Not Found",
+            _   => "Error"
+        },
+        status
+    });
+});
 
 
 // =====================================================
@@ -508,6 +637,35 @@ app.UseExceptionHandler();
 // =====================================================
 
 app.UseHttpsRedirection();
+
+
+// =====================================================
+// SECURITY HEADERS
+// MODULE 11 - EXERCISE 7
+// =====================================================
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append(
+        "X-Content-Type-Options",
+        "nosniff");
+
+    context.Response.Headers.Append(
+        "X-Frame-Options",
+        "DENY");
+
+    context.Response.Headers.Append(
+        "Referrer-Policy",
+        "strict-origin-when-cross-origin");
+
+    context.Response.Headers.Append(
+        "Content-Security-Policy",
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline';");
+
+    await next();
+});
 
 
 // =====================================================
@@ -536,11 +694,18 @@ app.MapScalarApiReference(options =>
         .AddDocument("v2", "API Version 2.0");
 });
 
+
+// =====================================================
+// SWAGGER
+// =====================================================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+
 // =====================================================
 // ROUTING
 // =====================================================
@@ -553,6 +718,13 @@ app.UseRouting();
 // =====================================================
 
 app.UseCors("Angular");
+
+
+// =====================================================
+// RATE LIMITING
+// =====================================================
+
+app.UseRateLimiter();
 
 
 // =====================================================
@@ -594,7 +766,6 @@ app.Use(async (context, next) =>
         var tokens =
             antiforgery.GetAndStoreTokens(context);
 
-
         context.Response.Cookies.Append(
             "XSRF-TOKEN",
             tokens.RequestToken!,
@@ -622,22 +793,12 @@ app.Use(async (context, next) =>
 app.UseMiddleware<V1DeprecationMiddleware>();
 
 
-
-
 // =====================================================
 // SIGNALR HUB
-// IMPORTANT: CORS MUST MATCH "Angular"
 // =====================================================
 
 app.MapHub<TmsHub>("/hubs/tms")
    .RequireCors("Angular");
-
-
-// =====================================================
-// RATE LIMITING
-// =====================================================
-
-app.UseRateLimiter();
 
 
 // =====================================================
@@ -652,3 +813,60 @@ app.MapControllers();
 // =====================================================
 
 app.Run();
+
+static async Task EnsureBootstrapAdminAsync(
+    IServiceProvider services,
+    IConfiguration configuration)
+{
+    if (!configuration.GetValue<bool>("BootstrapAdmin:Enabled"))
+        return;
+
+    var email = configuration["BootstrapAdmin:Email"];
+    var password = configuration["BootstrapAdmin:Password"];
+    var firstName = configuration["BootstrapAdmin:FirstName"];
+    var lastName = configuration["BootstrapAdmin:LastName"];
+
+    if (string.IsNullOrWhiteSpace(email) ||
+        string.IsNullOrWhiteSpace(password) ||
+        string.IsNullOrWhiteSpace(firstName) ||
+        string.IsNullOrWhiteSpace(lastName))
+    {
+        throw new InvalidOperationException(
+            "BootstrapAdmin is enabled but its email, password, first name, or last name is missing.");
+    }
+
+    using var scope = services.CreateScope();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<TmsUser>>();
+
+    const string adminRole = "Admin";
+    if (!await roleManager.RoleExistsAsync(adminRole))
+    {
+        var createRoleResult = await roleManager.CreateAsync(new IdentityRole(adminRole));
+        if (!createRoleResult.Succeeded)
+            throw new InvalidOperationException("Unable to create the BootstrapAdmin role.");
+    }
+
+    var admin = await userManager.FindByEmailAsync(email);
+    if (admin is null)
+    {
+        admin = new TmsUser
+        {
+            UserName = email,
+            Email = email,
+            FirstName = firstName,
+            LastName = lastName
+        };
+
+        var createUserResult = await userManager.CreateAsync(admin, password);
+        if (!createUserResult.Succeeded)
+            throw new InvalidOperationException("Unable to create the BootstrapAdmin user.");
+    }
+
+    if (!await userManager.IsInRoleAsync(admin, adminRole))
+    {
+        var addRoleResult = await userManager.AddToRoleAsync(admin, adminRole);
+        if (!addRoleResult.Succeeded)
+            throw new InvalidOperationException("Unable to assign the BootstrapAdmin role.");
+    }
+}

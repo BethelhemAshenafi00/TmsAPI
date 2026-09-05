@@ -55,23 +55,31 @@ public class StudentService : IStudentService
     {
         var student = new Student
         {
-            RegistrationNumber = request.RegistrationNumber,
+            // RegistrationNumber will be generated automatically
             Name = request.Name,
             GPA = request.GPA,
             IsActive = true
         };
 
+        // First save so the database generates the Id
         _context.Students.Add(student);
 
         await _context.SaveChangesAsync(ct);
 
+        // Generate registration number using the database Id
+        student.RegistrationNumber =
+            $"STU-{DateTime.UtcNow.Year}-{student.Id:D4}";
+
+        // Save the generated registration number
+        await _context.SaveChangesAsync(ct);
+
         _logger.LogInformation(
-            "Created student {StudentId}",
-            student.Id);
+            "Created student {StudentId} with registration number {RegistrationNumber}",
+            student.Id,
+            student.RegistrationNumber);
 
         return await GetByIdAsync(student.Id, ct);
     }
-
     // =========================
     // CHECK REGISTRATION NUMBER
     // =========================

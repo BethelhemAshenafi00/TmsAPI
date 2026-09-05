@@ -14,7 +14,6 @@ public class StudentsController(
     IStudentService studentService,
     LinkGenerator linkGenerator) : ControllerBase
 {
-
     // =========================
     // GET STUDENT BY ID
     // =========================
@@ -33,12 +32,10 @@ public class StudentsController(
         if (student is null)
             return NotFound();
 
-
         var selfPath = linkGenerator.GetPathByName(
             HttpContext,
             nameof(GetStudentById),
             new { id })!;
-
 
         var links = new List<LinkDto>
         {
@@ -46,7 +43,6 @@ public class StudentsController(
             new(selfPath, "update", "PUT"),
             new(selfPath, "delete", "DELETE")
         };
-
 
         var detail = new StudentDetailDto
         {
@@ -57,11 +53,8 @@ public class StudentsController(
             Links = links
         };
 
-
         return Ok(detail);
     }
-
-
 
     // =========================
     // CREATE STUDENT
@@ -70,43 +63,21 @@ public class StudentsController(
     [HttpPost]
     [ProducesResponseType(typeof(StudentResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [EndpointSummary("Create a new student")]
-    [EndpointDescription("Creates a student with a unique registration number.")]
+    [EndpointDescription("Creates a student with an automatically generated registration number.")]
     public async Task<IActionResult> Create(
         CreateStudentRequest request,
         CancellationToken ct)
     {
-
-        if(await studentService.RegistrationNumberExistsAsync(
-            request.RegistrationNumber, ct))
-        {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Registration number already exists",
-                Status = StatusCodes.Status409Conflict,
-                Detail = $"Student with registration number '{request.RegistrationNumber}' already exists."
-            });
-        }
-
-
+        // Registration number is generated automatically
+        // by StudentService after the database generates the student Id.
         var student = await studentService.CreateAsync(request, ct);
-
 
         return CreatedAtAction(
             nameof(GetStudentById),
             new { id = student.Id },
             student);
     }
-
-
-
-
-    // =========================
-    // UPDATE STUDENT
-    // =========================
-
-
 
     // =========================
     // DELETE STUDENT
@@ -120,33 +91,30 @@ public class StudentsController(
         int id,
         CancellationToken ct)
     {
-
         var deleted = await studentService.DeleteAsync(id, ct);
-
 
         return deleted
             ? NoContent()
             : NotFound();
     }
 
-
-
     // =========================
     // LIST STUDENTS
     // =========================
 
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResponse<StudentResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(
+        typeof(PagedResponse<StudentResponseDto>),
+        StatusCodes.Status200OK)]
     [EndpointSummary("List students with pagination")]
     [EndpointDescription("Returns a paginated list of students.")]
     public async Task<IActionResult> GetStudents(
         [FromQuery] PagedRequest request,
         CancellationToken ct)
     {
-
-        var students = await studentService.GetStudentsAsync(request, ct);
+        var students =
+            await studentService.GetStudentsAsync(request, ct);
 
         return Ok(students);
     }
-
 }

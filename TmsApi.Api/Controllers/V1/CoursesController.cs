@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Infrastructure.Persistence;
 namespace TmsApi.Api.Controllers.V1;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/courses")]
+[Route("api/courses")]
 
 public class CourseController(TmsDbContext context) : ControllerBase
 {

@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TmsApi.Domain.Entities;
 using TmsApi.Infrastructure.Identity;
@@ -9,15 +11,15 @@ using TmsApi.Infrastructure.Services;
 namespace TmsApi.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class AuthController : ControllerBase
+[Route("api/auth")]
+public class authController : ControllerBase
 {
     private readonly UserManager<TmsUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly TmsDbContext _context;
     private readonly TokenService _tokenService;
 
-    public AuthController(
+    public authController(
         UserManager<TmsUser> userManager,
         RoleManager<IdentityRole> roleManager,
         TmsDbContext context,
@@ -34,6 +36,8 @@ public class AuthController : ControllerBase
     // REGISTER
     // =====================================================
 
+    // Public registration — always creates a Student auth.
+    // Role is NOT accepted from the client to prevent privilege escalation.
     public record RegisterRequest(
         string Email,
         string Password,
@@ -42,81 +46,142 @@ public class AuthController : ControllerBase
         string Role
     );
 
+    private const string StudentRole = "Student";
+    private const string InstructorRole = "Instructor";
+    private const string AdminRole = "Admin";
 
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(
-        [FromBody] RegisterRequest request)
-    {
-        var existingUser =
-            await _userManager.FindByEmailAsync(
-                request.Email
-            );
-
-
-        if (existingUser != null)
+    private static readonly HashSet<string> AllowedRegistrationRoles =
+        new(StringComparer.OrdinalIgnoreCase)
         {
-            // Prevent account enumeration
-            return Ok(new
-            {
-                message = "Registration request received."
-            });
-        }
-
-
-        var user = new TmsUser
-        {
-            UserName = request.Email,
-            Email = request.Email,
-            FirstName = request.FirstName,
-            LastName = request.LastName
+            StudentRole,
+            InstructorRole,
+            AdminRole
         };
+[HttpPost("register")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> Register(
+    [FromBody] RegisterRequest request,
+    CancellationToken ct)
+{
+    if (string.IsNullOrWhiteSpace(request.Role))
+        return BadRequest(new { detail = "Role is required." });
 
-
-        var result =
-            await _userManager.CreateAsync(
-                user,
-                request.Password
-            );
-
-
-        if (!result.Succeeded)
+    if (!AllowedRegistrationRoles.Contains(request.Role))
+        return BadRequest(new
         {
-            var errors =
-                result.Errors.Select(
-                    e => e.Description
-                );
+            detail = "Invalid role. Allowed roles: Student, Instructor, Admin."
+        });
 
-            return BadRequest(new
-            {
-                errors
-            });
-        }
+    var role = AllowedRegistrationRoles.Single(
+        allowedRole => string.Equals(
+            allowedRole,
+            request.Role,
+            StringComparison.OrdinalIgnoreCase));
 
+    // Anonymous users can ONLY register as Student.
+    // Instructor/Admin accounts must be created by an Admin.
+    if (role != StudentRole && !User.IsInRole(AdminRole))
+    {
+        return Forbid();
+    }
 
-        // =================================================
-        // ENSURE ROLE EXISTS
-        // =================================================
+    var existingUser =
+        await _userManager.FindByEmailAsync(request.Email);
 
-        if (!await _roleManager.RoleExistsAsync(
-                request.Role))
-        {
-            await _roleManager.CreateAsync(
-                new IdentityRole(request.Role)
-            );
-        }
-
-
-        await _userManager.AddToRoleAsync(
-            user,
-            request.Role
-        );
-
-
+    if (existingUser != null)
+    {
         return Ok(new
         {
-            message = "Registration successful."
+            message = "Registration request received."
         });
     }
+
+    await using var transaction =
+        await _context.Database.BeginTransactionAsync(ct);
+
+    var user = new TmsUser
+    {
+        UserName = request.Email,
+        Email = request.Email,
+        FirstName = request.FirstName,
+        LastName = request.LastName
+    };
+
+    var createUserResult =
+        await _userManager.CreateAsync(
+            user,
+            request.Password);
+
+    if (!createUserResult.Succeeded)
+    {
+        var errors =
+            createUserResult.Errors
+                .Select(e => e.Description);
+
+        return BadRequest(new { errors });
+    }
+
+    // Create role if it does not exist
+    if (!await _roleManager.RoleExistsAsync(role))
+    {
+        var createRoleResult =
+            await _roleManager.CreateAsync(
+                new IdentityRole(role));
+
+        if (!createRoleResult.Succeeded)
+        {
+            var errors =
+                createRoleResult.Errors
+                    .Select(e => e.Description);
+
+            return BadRequest(new { errors });
+        }
+    }
+
+    // Assign requested role
+    var addRoleResult =
+        await _userManager.AddToRoleAsync(
+            user,
+            role);
+
+    if (!addRoleResult.Succeeded)
+    {
+        var errors =
+            addRoleResult.Errors
+                .Select(e => e.Description);
+
+        return BadRequest(new { errors });
+    }
+
+    // Create Student profile only for Student accounts
+    if (role == StudentRole)
+    {
+        var student = new Student
+        {
+            Name = user.DisplayName,
+            UserId = user.Id,
+            GPA = 0,
+            IsActive = true
+        };
+
+        _context.Students.Add(student);
+
+        await _context.SaveChangesAsync(ct);
+
+        student.RegistrationNumber =
+            $"STU-{DateTime.UtcNow.Year}-{student.Id:D4}";
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    await transaction.CommitAsync(ct);
+
+    return Ok(new
+    {
+        message = "Registration successful.",
+        role
+    });
+}
 
 
     // =====================================================
@@ -130,6 +195,7 @@ public class AuthController : ControllerBase
 
 
     [HttpPost("login")]
+    [EnableRateLimiting("AuthLimiter")]
     public async Task<IActionResult> Login(
         [FromBody] LoginRequest request)
     {
@@ -157,7 +223,7 @@ public class AuthController : ControllerBase
             return StatusCode(423, new
             {
                 detail =
-                    "Account locked due to multiple failed login attempts. Try again in 15 minutes."
+                    "auth locked due to multiple failed login attempts. Try again in 15 minutes."
             });
         }
 
@@ -290,7 +356,7 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new
             {
-                detail = "User account not found."
+                detail = "User auth not found."
             });
         }
 
